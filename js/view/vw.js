@@ -77,7 +77,7 @@ vw.prototype.init = function ( callbacks ){
 			if (self.move.a == null){
 				self.move.a = {'coords':[event.pageX, event.pageY]};
 			} else if (self.move.b == null){
-				self.move.b = {'coords':[event.pageX, event.pageY]};
+				self.move.b = {'coords':[event.pageX-10, event.pageY-10]};
 				self.callbacks.updatePoint( self.move.a, self.move.b );
 				self.move.a = null; self.move.b = null;
 			}

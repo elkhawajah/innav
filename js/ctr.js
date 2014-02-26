@@ -225,7 +225,7 @@ ctr.prototype.onPointCreate = function ( p ){
 		"id":id,
 		"coords":[p.coords[0],p.coords[1]],
 		"Vectors":[],
-		"Floor":"000"	// current floor
+		"Floor":self.model.model.floors[0]	// current floor
 	});
 	blist.push( p );
 	self.view.newPoint( p );
