@@ -129,3 +129,23 @@ dm.prototype.init = function ( json ){
 		}
 	}
 };
+
+dm.prototype.getJSON = function (){
+	var json = {
+		"Building":null,
+		"Floors":[],
+		"Beacons":[],
+		"Places":[]
+	}
+	json.Building = this.model.building.getJSON();
+	for (var i = 0; i < this.model.floors.length; i++){
+		json.Floors.push(this.model.floors[i].getJSON());
+	}
+	for (var i = 0; i < this.model.beacons.length; i++){
+		json.Beacons.push(this.model.beacons[i].getJSON());
+	}
+	for (var i = 0; i < this.model.places.length; i++){
+		json.Places.push(this.model.places[i].getJSON());
+	}
+	return json;
+};

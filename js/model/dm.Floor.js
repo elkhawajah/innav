@@ -17,3 +17,11 @@ oo.inherit( dm.Floor, dm );
 
 dm.Floor.DEFAULT_NAMES = ["B1","B2","B3","G","1","2","3","4","5","6","7","8","9"];
 dm.Floor.SPECIAL_ENTRY_LEVEL = "G";
+
+dm.Floor.prototype.getJSON = function (){
+	return {
+		'id':this.id,
+		'name':this.name,
+		'alpha':this.alpha
+	};
+};

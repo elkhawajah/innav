@@ -183,6 +183,10 @@ ctr.prototype.getUserVector = function (){
 	return null;
 };
 
+ctr.prototype.getJSON = function (){
+	return this.model.getJSON();
+};
+
 // by mouse location
 // param: not dm.Beacon
 ctr.prototype.findBeaconByPageCoord = function ( p ){
@@ -241,14 +245,20 @@ ctr.prototype.onEdgeCreate = function ( p1, p2 ){
 	}
 };
 
+// param: not dm.Beacon
 ctr.prototype.onPointDelete = function ( p ){
 	var self = this.context,
 		blist = self.model.model.beacons;
 	p1 = self.findBeaconByPageCoord(p);
 	var v = p1.vectors;
 	for (var i = 0; i < v.length; i++){
-		var p2 = {'coords':[ v[i].coords[0], v[i].coords[1] ]};
-		self.callbacks.delEdge( p, p2 );
+		var p2 = v[i];
+		for (var j = 0; j < p2.vectors.length; j++){
+			if (p2.vectors[j] == p1){
+				p2.vectors.splice(j, 1);
+				break;
+			}
+		}
 	}
 	for (var i = 0; i < blist.length; i++){
 		if (blist[i] == p1){
@@ -259,6 +269,7 @@ ctr.prototype.onPointDelete = function ( p ){
 	self.showGraph();
 };
 
+// param: not dm.Beacon
 ctr.prototype.onEdgeDelete = function ( p1, p2 ){
 	var self = this.context;
 	p1 = self.findBeaconByPageCoord(p1);
@@ -278,6 +289,7 @@ ctr.prototype.onEdgeDelete = function ( p1, p2 ){
 	self.showGraph();
 };
 
+// param: not dm.Beacon
 ctr.prototype.onPointUpdate = function ( p1, p2 ){
 	var self = this.context;
 	p1 = self.findBeaconByPageCoord(p1);

@@ -19,17 +19,35 @@
 <body>
 	<div id="canvas">
 	</div>
+	<div id="console">
+	</div>
+	<button id="saveBtn">Save graph</button>
 </body>
 <script type="text/javascript">
 	$(document).ready(function (){
 		var controller = null;
+		var saveBtn = $('#saveBtn');
 		$.ajax({
-			url: 'json/test_user.json',
+			url: 'json/test_user_s.json',
 			type: 'get',
 			cache: false,
 			dataType: 'json',
 			success: function( data ){
 				controller = new ctr(data);
+				saveBtn.on('click',function(){
+					$.ajax({
+						url: 'simple.php',
+						type: 'post',
+						data: {'data':controller.getJSON()},
+						cache: false,
+						success: function(){
+							alert("Saved");
+						},
+						error: function(xhr, status, error) {
+							console.log(error);
+						}
+					});
+				});
 			},
 			error : function(xhr, status, error) {
 				throw new Error(xhr.responseText);

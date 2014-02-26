@@ -27,3 +27,16 @@ dm.Beacon.prototype.isNeighbor = function ( node ){
 	}
 	return false;
 };
+
+dm.Beacon.prototype.getJSON = function (){
+	var v = [];
+	for (var i = 0; i < this.vectors.length; i++){
+		v.push(this.vectors[i].id);
+	}
+	return {
+		'id':this.id,
+		'coords':[this.coords[0], this.coords[1]],
+		'Vectors':v,
+		'Floor':this.floor.id
+	};
+};

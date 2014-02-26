@@ -11,3 +11,11 @@ dm.Building = function dmBuilding( json ){
 };
 
 oo.inherit( dm.Building, dm );
+
+dm.Building.prototype.getJSON = function (){
+	return {
+		'name':this.name,
+		'id':this.id,
+		'user_id':this.user
+	};
+};

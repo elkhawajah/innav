@@ -51,6 +51,19 @@ dm.Place.prototype.getNearestBeacon = function (){
 	return this.vectors[idx];
 };
 
+dm.Place.prototype.getJSON = function (){
+	var v = [];
+	for (var i = 0; i < this.vectors.length; i++){
+		v.push(this.vectors[i].id);
+	}
+	return {
+		'id':this.id,
+		'coords':[this.coords[0], this.coords[1]],
+		'Vectors':v,
+		'Floor':this.floor.id
+	};
+};
+
 dm.Place.DEFAULT_TYPES = ["Office","Laboratory","Classroom","Lecture","Theater","Emergency","Elevation","Restroom"];
 dm.Place.SPECIAL_EMERGENCY = "Emergency";
 dm.Place.SPECIAL_ELEVATION = "Elevation";

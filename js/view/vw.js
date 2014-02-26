@@ -4,6 +4,7 @@
 vw = function Vw(){
 	// DOM properties; jQuery objects
 	this.canvas = null;
+	this.console = null;
 	this.map = null;
 	this.pointSwitch = null;
 	this.edgeSwitch = null;
@@ -32,8 +33,8 @@ vw.prototype.clear = function (){
 };
 
 vw.prototype.init = function ( callbacks ){
-	console.log('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; c - Turn off all modes');
 	var self = this;
+	this.console = $('#console');
 	this.canvas = $('#canvas');
 	this.canvas.css({
 		'background':'url(img/test.png) no-repeat',
@@ -82,9 +83,9 @@ vw.prototype.init = function ( callbacks ){
 			}
 		}
 	});
+	this.console.html('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; c - Turn off all modes<br>');
 	$(document).keypress( function (event){
-		console.clear();
-		console.log('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; c - Turn off all modes');
+		self.console.html('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; c - Turn off all modes<br>');
 		$('circle[fill="red"]').remove();
 		$('line[stroke="red"]').remove();
 		self.isCreatingEdge = false;
@@ -95,26 +96,29 @@ vw.prototype.init = function ( callbacks ){
 		switch(event.which){
 			case 101: 	// e
 				self.isCreatingEdge = true;
-				console.log('Now in Edge mode.');
+				self.console.html(self.console.html() + 'Now in Edge mode.');
 				break;
 			case 118: 	// v
 				self.isCreatingPoint = true;
-				console.log('Now in Point mode.');
+				self.console.html(self.console.html() + 'Now in Point mode.');
 				break;
 			case 102: 	// f
 				self.isFindingPath = true;
-				console.log('Now in Find mode.');
+				self.console.html(self.console.html() + 'Now in Find mode.');
 				break;
 			case 99: 	// c
-				console.log('All modes are OFF.');
+				self.console.html(self.console.html() + 'All modes are OFF.');
 				break;
 			case 100: 	// d
 				self.isDeleting = true;
-				console.log('Now in DELETE mode');
+				self.console.html(self.console.html() + 'Now in DELETE mode.');
 				break;
 			case 109: 	// m
 				self.isMoving = true;
-				console.log('Now in Moving mode');
+				self.console.html(self.console.html() + 'Now in Moving mode.');
+				break;
+			default:
+				self.console.html(self.console.html() + 'Invalid key.');
 				break;
 		}
 	});
