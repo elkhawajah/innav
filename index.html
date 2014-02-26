@@ -1,0 +1,40 @@
+<html>
+<meta charset="utf-8">
+<head>
+	<!-- DOM manipulation libraries -->
+	<script type="text/javascript" src="js/lib/jquery-2.1.0.min.js"></script>
+	<!-- SVG manupulation; jQuery plugin -->
+	<script type="text/javascript" src="js/lib/jquery.svg.min.js"></script>
+	<link rel="stylesheet" type="text/css" href="css/jquery.svg.css">
+	<!-- Application main file -->
+	<script type="text/javascript" src="js/OO.js"></script>
+	<script type="text/javascript" src="js/ctr.js"></script>
+	<script type="text/javascript" src="js/model/dm.js"></script>
+	<script type="text/javascript" src="js/model/dm.Building.js"></script>
+	<script type="text/javascript" src="js/model/dm.Floor.js"></script>
+	<script type="text/javascript" src="js/model/dm.Beacon.js"></script>
+	<script type="text/javascript" src="js/model/dm.Place.js"></script>
+	<script type="text/javascript" src="js/view/vw.js"></script>
+</head>
+<body>
+	<div id="canvas">
+	</div>
+</body>
+<script type="text/javascript">
+	$(document).ready(function (){
+		var controller = null;
+		$.ajax({
+			url: 'json/test_user.json',
+			type: 'get',
+			cache: false,
+			dataType: 'json',
+			success: function( data ){
+				controller = new ctr(data);
+			},
+			error : function(xhr, status, error) {
+				throw new Error(xhr.responseText);
+			}
+		});
+	});
+</script>
+</html>
