@@ -5,7 +5,7 @@
 dm.Beacon = function dmBeacon( json ){
 	dm.call(this);
 	this.id = json.id;
-	this.vectors = json.Vectors;	// adjacency list
+	this.vectors = json.Vectors == undefined ? [] : json.Vectors;	// adjacency list
 	// For A* search
 	this.coords = [json.coords[0], json.coords[1], 1];	// x, y, w;
 	// f, g, h; f = g + h; g = past cost *squared*, h = future cost *squared*
@@ -15,6 +15,7 @@ dm.Beacon = function dmBeacon( json ){
 	this.parent = null;	// backward linking for reconstructing path
 	// Bottom-up linking
 	this.floor = json.Floor;	// initialize to a string id
+	this.ispl = false;
 };
 
 oo.inherit( dm.Beacon, dm );

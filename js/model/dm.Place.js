@@ -7,13 +7,14 @@ dm.Place = function dmPlace( json ){
 	this.id = json.id;
 	this.coords = [json.coords[0], json.coords[1], 1];	// x, y, w
 	// Bottom-up linking
-	this.vectors = json.Vectors;	// reverse adjacency list; initialized to array of string ids
+	this.vectors = json.Vectors == undefined ? [] : json.Vectors;	// reverse adjacency list; initialized to array of string ids
 	this.floor = json.Floor;	// initialized to string id; jump linking
 	// Place human-friendly properties
 	this.name = "";
 	this.type = "";
 	this.people = "";
 	this.misc = "";
+	this.ispl = true;
 };
 
 oo.inherit( dm.Place, dm );
@@ -62,6 +63,15 @@ dm.Place.prototype.getJSON = function (){
 		'Vectors':v,
 		'Floor':this.floor.id
 	};
+};
+
+dm.Place.prototype.isNeighbor = function ( node ){
+	for (var i = 0; i < this.vectors.length; i++){
+		if (this.vectors[i] == node){
+			return true;
+		}
+	}
+	return false;
 };
 
 dm.Place.DEFAULT_TYPES = ["Office","Laboratory","Classroom","Lecture","Theater","Emergency","Elevation","Restroom"];

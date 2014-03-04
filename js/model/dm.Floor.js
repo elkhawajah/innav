@@ -9,6 +9,7 @@ dm.Floor = function dmFloor( json ){
 	this.id = json.id;
 	this.name = json.name;
 	this.alpha = json.alpha;
+	this.scale = json.scale;	// px : meter
 	// Bottom-up linking
 	this.building = null;
 };
@@ -22,6 +23,7 @@ dm.Floor.prototype.getJSON = function (){
 	return {
 		'id':this.id,
 		'name':this.name,
-		'alpha':this.alpha
+		'alpha':this.alpha,
+		'scale':this.scale
 	};
 };

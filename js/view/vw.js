@@ -17,6 +17,7 @@ vw = function Vw(){
 	// View elements
 	this.edges = [];
 	this.points = [];
+	this.places = [];
 	// Edge editing properties
 	this.edge = {'a': null, 'b': null};
 	// Click find path
@@ -47,45 +48,26 @@ vw.prototype.init = function ( callbacks ){
 	this.edgeSwitch = $('#edgeSwitch');
 	this.callbacks = callbacks;
 	this.canvas.on('click', function (event){
-		if (self.isFindingPath){
-			if (self.point.a == null){
-				$('circle[fill="red"]').remove();
-				$('line[stroke="red"]').remove();
-				self.point.a = {'coords':[event.pageX, event.pageY]};
-			} else if (self.point.b == null){
-				self.point.b = {'coords':[event.pageX, event.pageY]};
-				// Find nearest beacons
-				self.callbacks.nav(self.point.a, self.point.b);
-				// Clean up
-				self.point.a = null; self.point.b = null;
+		if (self.isCreatingPoint || self.isCreatingPlace){
+			var ispl = false;
+			if (self.isCreatingPlace){
+				ispl = true;
 			}
-		} else if (self.isCreatingPoint){
-			var p = {'coords':[event.pageX-10, event.pageY-10]};
+			var p = {'coords':[event.pageX-10, event.pageY-10],'ispl':ispl};
 			if (!self.isDrawn(p)){
 				self.callbacks.newPoint( p );
 			}
-		} else if (self.isCreatingEdge){
-			if (self.edge.a == null){
-				self.edge.a = {'coords':[event.pageX, event.pageY]};
-			} else if (self.edge.b == null){
-				self.edge.b = {'coords':[event.pageX, event.pageY]};
-				self.callbacks.newEdge( self.edge.a, self.edge.b );
-				// Clean up
-				self.edge.a = null; self.edge.b = null;
-			}
 		} else if (self.isMoving){
-			if (self.move.a == null){
-				self.move.a = {'coords':[event.pageX, event.pageY]};
-			} else if (self.move.b == null){
+			if (self.move.a !== null && self.move.b == null){
 				self.move.b = {'coords':[event.pageX-10, event.pageY-10]};
 				self.callbacks.updatePoint( self.move.a, self.move.b );
 				self.move.a = null; self.move.b = null;
 			}
 		}
 	});
-	this.console.html('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; c - Turn off all modes<br>');
+	this.console.html('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; p - Place; c - Turn off all modes<br>');
 	$(document).keypress( function (event){
-		self.console.html('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; c - Turn off all modes<br>');
+		self.console.html('Modes: e - Edge; v - Point; f - Find; d - Delete; m - Move; p - Place; c - Turn off all modes<br>');
 		$('circle[fill="red"]').remove();
 		$('line[stroke="red"]').remove();
 		self.isCreatingEdge = false;
@@ -93,6 +75,7 @@ vw.prototype.init = function ( callbacks ){
 		self.isFindingPath = false;
 		self.isDeleting = false;
 		self.isMoving = false;
+		self.isCreatingPlace = false;
 		switch(event.which){
 			case 101: 	// e
 				self.isCreatingEdge = true;
@@ -115,7 +98,11 @@ vw.prototype.init = function ( callbacks ){
 				break;
 			case 109: 	// m
 				self.isMoving = true;
-				self.console.html(self.console.html() + 'Now in Moving mode.');
+				self.console.html(self.console.html() + 'Now in Move mode.');
+				break;
+			case 112: 	// p
+				self.isCreatingPlace = true;
+				self.console.html(self.console.html() + 'Now in Place mode.');
 				break;
 			default:
 				self.console.html(self.console.html() + 'Invalid key.');
@@ -126,6 +113,9 @@ vw.prototype.init = function ( callbacks ){
 
 vw.prototype.newPoint = function ( p, highlight ){
 	var color = 'black', self = this;
+	if (this.isCreatingPlace || p.ispl){
+		color = 'blue';
+	}
 	if (highlight){
 		color = 'red';
 	}
@@ -133,11 +123,36 @@ vw.prototype.newPoint = function ( p, highlight ){
 		if (!highlight){
 			this.points.push(p);
 		}
-		var c = $( this.map.circle(p.coords[0], p.coords[1], 10, {fill:color}) );
+		var c = $( this.map.circle(p.coords[0], p.coords[1], 10, {fill:color, 'ispl':p.ispl}) );
 		c.on('click', function(event){
 			if (self.isDeleting){
-				var p = {'coords':[event.pageX, event.pageY]};
 				self.callbacks.delPoint( p );
+			} else if (self.isCreatingEdge){
+				if (self.edge.a == null){
+					self.edge.a = p;
+				} else if (self.edge.b == null){
+					self.edge.b = p;
+					self.callbacks.newEdge( self.edge.a, self.edge.b );
+					// Clean up
+					self.edge.a = null; self.edge.b = null;
+				}
+			} else if (self.isFindingPath){
+				if (self.point.a == null){
+					$('circle[fill="red"]').remove();
+					$('line[stroke="red"]').remove();
+					self.point.a = p;
+				} else if (self.point.b == null){
+					self.point.b = p;
+					// Find nearest beacons
+					self.callbacks.nav(self.point.a, self.point.b);
+					// Clean up
+					self.point.a = null; self.point.b = null;
+				}
+			} else if (self.isMoving){
+				if (self.move.a == null){
+					self.move.a = p;
+					event.stopPropagation();
+				}
 			}
 		});
 	}
@@ -145,6 +160,9 @@ vw.prototype.newPoint = function ( p, highlight ){
 
 vw.prototype.newEdge = function ( p1, p2, highlight ){
 	var color = 'black', self = this;
+	if (p1.ispl || p2.ispl){
+		color = 'blue';
+	}
 	if (highlight){
 		color = 'red';
 	}
@@ -155,9 +173,6 @@ vw.prototype.newEdge = function ( p1, p2, highlight ){
 		var e = $( this.map.line(p1.coords[0], p1.coords[1], p2.coords[0], p2.coords[1], {stroke:color,strokeWidth:5}) );
 		e.on('click', function(event){
 			if (self.isDeleting){
-				var x1 = $(this).attr('x1'), y1 = $(this).attr('y1'), x2 = $(this).attr('x2'), y2 = $(this).attr('y2'),
-					p1 = {'coords':[x1, y1]},
-					p2 = {'coords':[x2, y2]};
 				self.callbacks.delEdge( p1, p2 );
 			}
 		});
@@ -168,6 +183,11 @@ vw.prototype.isDrawn = function ( p1, p2 ){
 	if (p2 == undefined){	// Check point
 		for (var i = 0; i < this.points.length; i++){
 			if (this.points[i] == p1){
+				return true;
+			}
+		}
+		for (var i = 0; i < this.places.length; i++){
+			if (this.places[i] == p1){
 				return true;
 			}
 		}
