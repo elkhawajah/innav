@@ -59,6 +59,15 @@ dm.prototype.findNodeById = function ( id ){
 	return null;
 }
 
+dm.prototype.findNodeByPid = function ( id ){
+	for (var i = 0; i < this.model.nodes.length; i++){
+		if (this.model.nodes[i].pid == id){
+			return this.model.nodes[i];
+		}
+	}
+	return null;
+}
+
 /**
  * Generate data model representation of JSON object
  * @param  {[JSON]} json JSON object that contains data to be modelled
