@@ -5,26 +5,21 @@
  * User
  * - Building
  *   - Floor
- *     - Beacon
- *       - Place
- *       - Vector (adjacency list)
+ *     - Node
  *
  * Data model structure (bottom-up, flattened structure)
- * Beacon
+ * Node
  *    - Floor; ref
  *    - Building; ref
- *    - Place; ref
- *    - Vector (adjacency list)
+ *    - Vector (adjacency list to other Nodes)
  * Floor
  * Building
- * Place
  */
 dm = function Dm(){
 	this.model = {
 		"building":null,
 		"floors":[],
-		"beacons":[],
-		"places":[]
+		"nodes":[]
 	}
 };
 
@@ -36,11 +31,10 @@ dm = function Dm(){
 dm.prototype.findPlaces = function ( key, floor ){
 	var regexKey = new RegExp(key, "gi");
 	places = [];
-	var tmp = this.model.places;
-	for (var i = 0; i < tmp.length; i++){
-		if (tmp[i].match(regexKey)){
-			if (floor == undefined || tmp[i].floor == floor){	// Either no floor preference or on a certain floor
-				places.push(tmp[i]);
+	for (var i = 0; i < this.model.nodes.length; i++){
+		if (this.model.nodes[i].match(regexKey)){
+			if (floor == undefined || this.model.nodes[i].floor == floor){	// Either no floor preference or on a certain floor
+				places.push(this.model.nodes[i]);
 			}
 		}
 	}
@@ -56,10 +50,10 @@ dm.prototype.findFloorById = function ( id ){
 	return null;
 };
 
-dm.prototype.findBeaconById = function ( id ){
-	for (var i = 0; i < this.model.beacons.length; i++){
-		if (this.model.beacons[i].id == id){
-			return this.model.beacons[i];
+dm.prototype.findNodeById = function ( id ){
+	for (var i = 0; i < this.model.nodes.length; i++){
+		if (this.model.nodes[i].gid == id){
+			return this.model.nodes[i];
 		}
 	}
 	return null;
@@ -82,49 +76,27 @@ dm.prototype.init = function ( json ){
 		this.model.floors.push( f );
 	}
 	// Beacons
-	var beacons = json.Beacons;
-	for (var i = 0; i < beacons.length; i++){
-		var b = new dm.Beacon(beacons[i]),
-			mf = this.findFloorById(b.floor);
+	var nodes = json.Nodes;
+	for (var i = 0; i < nodes.length; i++){
+		var n = new dm.Node(nodes[i]),
+			mf = this.findFloorById(n.floor);
 		// Vertical linking
 		if (mf != null){
-			b.floor = mf;	// Replace string id with object
+			n.floor = mf;	// Replace string id with object
 		} else {
-			throw new Error('Cannot find floor ID '+b.floor+' of beacon '+b.id);
+			throw new Error('Cannot find floor ID '+n.floor+' of node '+n.id);
 		}
-		this.model.beacons.push( b );
-	}
-	// Places
-	var places = json.Places;
-	for (var i = 0; i < places.length; i++){
-		var p = new dm.Place(places[i]),
-			mb = null, mf = null;
-		// Vertical linking
-		for (var j = 0; j < p.vectors.length; j++){
-			mb = this.findBeaconById(p.vectors[j]);
-			if (mb != null){
-				p.vectors[j] = mb;	// Replace string id with object
-			} else {
-				throw new Error('Cannot find beacon ID '+p.vectors[j]+' of place '+p.id);
-			}
-		}
-		mf = this.findFloorById(p.floor);
-		if (mf != null){
-			p.floor = mf;	// Replace string id with object
-		} else {
-			throw new Error('Cannot find floor ID '+b.floor+' of place '+p.id);
-		}
-		this.model.places.push( p );
+		this.model.nodes.push( n );
 	}
 	// Horizontal linking
-	for (var i = 0; i < this.model.beacons.length; i++){
-		var b = this.model.beacons[i], mb = null;
-		for (var j = 0; j < b.vectors.length; j++){
-			mb = this.findBeaconById(b.vectors[j]);
-			if (mb != null){
-				b.vectors[j] = mb;
+	for (var i = 0; i < this.model.nodes.length; i++){
+		var n = this.model.nodes[i], mn = null;
+		for (var j = 0; j < n.vectors.length; j++){
+			mn = this.findNodeById(n.vectors[j]);
+			if (mn != null){
+				n.vectors[j] = mn;
 			} else {
-				throw new Error('Cannot find beacon ID '+b.vectors[j]+' of vectors of beacon '+b.id);
+				throw new Error('Cannot find node ID '+n.vectors[j]+' of vectors of node '+n.id);
 			}
 		}
 	}
@@ -134,18 +106,14 @@ dm.prototype.getJSON = function (){
 	var json = {
 		"Building":null,
 		"Floors":[],
-		"Beacons":[],
-		"Places":[]
+		"Nodes":[]
 	}
 	json.Building = this.model.building.getJSON();
 	for (var i = 0; i < this.model.floors.length; i++){
 		json.Floors.push(this.model.floors[i].getJSON());
 	}
-	for (var i = 0; i < this.model.beacons.length; i++){
-		json.Beacons.push(this.model.beacons[i].getJSON());
-	}
-	for (var i = 0; i < this.model.places.length; i++){
-		json.Places.push(this.model.places[i].getJSON());
+	for (var i = 0; i < this.model.nodes.length; i++){
+		json.Nodes.push(this.model.nodes[i].getJSON());
 	}
 	return json;
 };

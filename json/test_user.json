@@ -1,73 +1,81 @@
 {
 	"Building":{
 		"name":"Awesome building",
-		"id":"000",
-		"user_id":"0000001"
+		"id":"0",
+		"UID":"1"
 		},
 	"Floors":[
 		{
-			"id":"000",
+			"id":"0",
 			"name":"Good floor",
 			"alpha":0,
 			"scale":[10,1]
 		}
 	],
-	"Beacons":[
+	"Nodes":[
 		{
-			"id":"000",
-			"coords":[90,100],
+			"GID":"0",
+			"Coords":[90,100],
 			"Vectors":["001"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"0",
+			"Floor":"0"
 		},
 		{
-			"id":"001",
-			"coords":[90,235],
+			"GID":"1",
+			"Coords":[90,235],
 			"Vectors":["000","002","007"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"1",
+			"Floor":"0"
 		},
 		{
-			"id":"002",
-			"coords":[220,235],
+			"GID":"2",
+			"Coords":[220,235],
 			"Vectors":["001","003","004"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"2",
+			"Floor":"0"
 		},
 		{
-			"id":"003",
-			"coords":[220,120],
+			"GID":"3",
+			"Coords":[220,120],
 			"Vectors":["002"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"3",
+			"Floor":"0"
 		},
 		{
-			"id":"004",
-			"coords":[400,235],
+			"GID":"4",
+			"Coords":[400,235],
 			"Vectors":["002","005","006"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"4",
+			"Floor":"0"
 		},
 		{
-			"id":"005",
-			"coords":[400,135],
+			"GID":"5",
+			"Coords":[400,135],
 			"Vectors":["004"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"5",
+			"Floor":"0"
 		},
 		{
-			"id":"006",
-			"coords":[560,235],
+			"GID":"6",
+			"Coords":[560,235],
 			"Vectors":["004"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"6",
+			"Floor":"0"
 		},
 		{
-			"id":"007",
-			"coords":[90,300],
+			"GID":"7",
+			"Coords":[90,300],
 			"Vectors":["001"],
-			"Floor":"000"
-		}
-	],
-	"Places":[
-		{
-			"id":"000",
-			"coords":[150,150],
-			"Vectors":["000"],
-			"Floor":"000"
+			"Type":"PHYSICAL_NODE",
+			"PID":"7",
+			"Floor":"0"
 		}
 	]
 }

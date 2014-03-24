@@ -5,7 +5,6 @@ ctr = function Ctr( json ){
 	this.view = new vw();
 	this.model = new dm();
 	this.path = null;	// array of nodes
-	this.localPath = null;	// a single Place node; nav within a single beacon
 	this.callbacks = {
 		"context": this,
 		"nav": this.nav,
@@ -15,14 +14,8 @@ ctr = function Ctr( json ){
 		"delEdge": this.onEdgeDelete,
 		"updatePoint": this.onPointUpdate
 	};
-	// this.currentFloor = null;
-	// this.alpha = this.currentFloor.alpha
-	/*
-	this.userVector = {
-		"beacon": null,
-		"alpha": null
-	}
-	*/
+	this.currentFloor = null;
+	this.user = null;
 	// Initialization
 	this.init( json );
 };
@@ -35,8 +28,8 @@ ctr.prototype.init = function ( json ){
 
 /**
  * Find shortest path to a destination; A* pathfinding
- * @param  {dm.Beacon} from Starting point
- * @param  {dm.Beacon} to   Destination
+ * @param  {dm.Node} from Starting point
+ * @param  {dm.Node} to   Destination
  */
 ctr.prototype.findPath = function ( from, to ){
 	closedset = [];	// The set of nodes already evaluated.
@@ -135,13 +128,13 @@ ctr.prototype.navigate = function ( from, to ){
 		this.path = this.findPath( from, to );
 	} else {	// On separate floors; find elevation instead
 		// Find nearest elevation
-		var elev = this.model.findPlaces(dm.Place.SPECIAL_ELEVATION, from.floor);
+		var elev = this.model.findPlaces(dm.Place.SPECIAL_TAG_ELEVATION, from.floor);
 		var paths = [];
 		for (var i = 0; i < elev.length; i++){
-			paths.push( this.findPath( from, elev[i].getNearestBeacon() ) );
+			paths.push( this.findPath( from, elev[i] ) );
 		}
 		if (paths.length == 1){
-			tihs.path = paths[0];
+			this.path = paths[0];
 		} else {
 			this.path = this.comparePaths(paths);
 		}
@@ -159,41 +152,19 @@ ctr.prototype.showNav = function (){
 			this.view.newEdge( this.path[i], this.path[i-1], true );
 		}
 	}
-	if (this.localPath !== null){
-		this.view.newPoint( this.localPath, true );
-		this.view.newEdge( this.path[this.path.length-1], this.localPath, true );
-	}
 };
 
 ctr.prototype.showGraph = function (){
 	this.view.clear();
-	for (var i = 0; i < this.model.model.beacons.length; i++){
+	for (var i = 0; i < this.model.model.nodes.length; i++){
 		// TODO check floor
-		var b = this.model.model.beacons[i];
-		this.view.newPoint( b );
-		for (var j = 0; j < b.vectors.length; j++){
-			var v = b.vectors[j];
-			this.view.newEdge( b, v );
+		var n = this.model.model.nodes[i];
+		this.view.newPoint( n );
+		for (var j = 0; j < n.vectors.length; j++){
+			var v = n.vectors[j];
+			this.view.newEdge( n, v );
 		}
 	}
-	for (var i = 0; i < this.model.model.places.length; i++){
-		// TODO check floor
-		var p = this.model.model.places[i];
-		this.view.newPoint( p );
-		for (var j = 0; j < p.vectors.length; j++){
-			var v = p.vectors[j];
-			this.view.newEdge( p, v );
-		}
-	}
-};
-
-/**
- * Determine user vector
- * @param  {Array} beacons Array of nearby beacons
- * @returns {Object} User vector
- */
-ctr.prototype.getUserVector = function (){
-	return null;
 };
 
 ctr.prototype.getJSON = function (){
@@ -201,46 +172,23 @@ ctr.prototype.getJSON = function (){
 };
 
 // by mouse location
-// param: not dm.Beacon
-ctr.prototype.findBeaconByViewCoord = function ( p ){
-	for (var i = 0; i < this.model.model.beacons.length; i++){
-		var b = this.model.model.beacons[i];
-		if (p.coords[0] == b.coords[0] && p.coords[1] == b.coords[1]){
-			return this.model.model.beacons[i];
-		}
-	}
-	return null;
-};
-
-// by mouse location
-// param: not dm.Beacon
-ctr.prototype.findPlaceByViewCoord = function ( p ){
-	for (var i = 0; i < this.model.model.places.length; i++){
-		var b = this.model.model.places[i];
-		if (p.coords[0] == b.coords[0] && p.coords[1] == b.coords[1]){
-			return this.model.model.places[i];
+// param: not dm.Node
+ctr.prototype.findNodeByViewCoord = function ( p ){
+	for (var i = 0; i < this.model.model.nodes.length; i++){
+		var n = this.model.model.nodes[i];
+		if (p.coords[0] == n.coords[0] && p.coords[1] == n.coords[1]){
+			return this.model.model.nodes[i];
 		}
 	}
 	return null;
 };
 
 // Callback; tmp
-// param: not dm.Beacon
+// param: not dm.Node
 ctr.prototype.nav = function ( from, to ){
 	var self = this.context;
-	self.localPath = null;
-	if (from.ispl){
-		from = self.findPlaceByViewCoord(from).getNearestBeacon();
-	} else {
-		from = self.findBeaconByViewCoord(from);
-	}
-	if (to.ispl){
-		to = self.findPlaceByViewCoord(to);
-		self.localPath = to;
-		to = to.getNearestBeacon();
-	} else {
-		to = self.findBeaconByViewCoord(to);
-	}
+	from = self.findNodeByViewCoord(from);
+	to = self.findNodeByViewCoord(to);
 	self.path = self.findPath( from, to );
 	if (self.path == null){
 		throw new Error("No path found");
@@ -248,146 +196,94 @@ ctr.prototype.nav = function ( from, to ){
 	self.showNav();
 };
 
-// param: not dm.Beacon
+// param: not dm.Node
 ctr.prototype.onPointCreate = function ( p ){
 	var self = this.context,
-		blist = self.model.model.beacons,
-		plist = self.model.model.places,
+		nlist = self.model.model.nodes,
 		json = {
-			"id":null,
-			"coords":[p.coords[0],p.coords[1]],
-			"Vectors":[],
-			"Floor":self.model.model.floors[0]	// current floor
+			'GID': null,
+			'Coords': [p.coords[0],p.coords[1]],
+			'Vectors': [],
+			'Type': p.type,
+			'Floor': self.model.model.floors[0]	// TODO: current floor
 		};
-	if (!p.ispl){
-		if (blist.length === 0){
-			json.id = '001';
-		} else {
-			json.id = blist[blist.length-1].id + 1;
-		}
-		p = new dm.Beacon( json );
-		blist.push( p );
+	if (nlist.length === 0){
+		json.GID = '0';
 	} else {
-		if (plist.length === 0){
-			json.id = '001';
-		} else {
-			json.id = plist[plist.length-1].id + 1;
-		}
-		p = new dm.Place( json );
-		plist.push( p );
+		json.GID = nlist.length.toString();
 	}
+	nlist.push( new dm.Node( json ) );
 	self.view.newPoint( p );
 };
 
-// param: not dm.Beacon
+// param: not dm.Node
 ctr.prototype.onEdgeCreate = function ( p1, p2 ){
 	var self = this.context;
 	if ( p1 == p2 ){
 		console.log("Warning: No edges created - duplicate vertices");
 		return;
 	}
-	if (p1.ispl && p2.ispl){
-		console.log("Warning: No edges created - cannot connect two Place nodes");
-	} else if (p1.ispl || p2.ispl){
-		pa = p1.ispl ? p1 : p2;	// place
-		pb = p1.ispl ? p2 : p1;	// non-place (beacon)
-		pa = self.findPlaceByViewCoord(pa);
-		pb = self.findBeaconByViewCoord(pb);
-		if (!pa.isNeighbor(pb)){
-			pa.vectors.push(pb);
-			self.view.newEdge( pa, pb );
-		} else {
-			console.log("Warning: No edges created - duplicate edge");
-		}
+	p1 = self.findNodeByViewCoord(p1);
+	p2 = self.findNodeByViewCoord(p2);
+	if (!p1.isNeighbor(p2)){
+		p1.vectors.push(p2);
+		p2.vectors.push(p1);
+		self.view.newEdge( p1, p2 );
 	} else {
-		p1 = self.findBeaconByViewCoord(p1);
-		p2 = self.findBeaconByViewCoord(p2);
-		if (!p1.isNeighbor(p2)){
-			p1.vectors.push(p2);
-			p2.vectors.push(p1);
-			self.view.newEdge( p1, p2 );
-		} else {
-			console.log("Warning: No edges created - duplicate edge");
-		}
+		console.log("Warning: No edges created - duplicate edge");
 	}
 };
 
-// param: not dm.Beacon
+// param: not dm.Node
 ctr.prototype.onPointDelete = function ( p ){
 	var self = this.context;
-	if (!p.ispl){
-		var blist = self.model.model.beacons;
-		p1 = self.findBeaconByViewCoord(p);
-		var v = p1.vectors;
-		for (var i = 0; i < v.length; i++){
-			var p2 = v[i];
-			for (var j = 0; j < p2.vectors.length; j++){
-				if (p2.vectors[j] == p1){
-					p2.vectors.splice(j, 1);
-					break;
-				}
-			}
-		}
-		for (var i = 0; i < blist.length; i++){
-			if (blist[i] == p1){
-				blist.splice(i, 1);
+	var nlist = self.model.model.nodes;
+	p1 = self.findNodeByViewCoord(p);
+	var v = p1.vectors;
+	// Clean up edges
+	for (var i = 0; i < v.length; i++){
+		var p2 = v[i];
+		for (var j = 0; j < p2.vectors.length; j++){
+			if (p2.vectors[j] == p1){
+				p2.vectors.splice(j, 1);
 				break;
 			}
 		}
-	} else {
-		var plist = self.model.model.places;
-		p = self.findPlaceByViewCoord(p);
-		for (var i = 0; i < plist.length; i++){
-			if (plist[i] == p){
-				plist.splice(i, 1);
-				break;
-			}
+	}
+	// Delete node
+	for (var i = 0; i < nlist.length; i++){
+		if (nlist[i] == p1){
+			nlist.splice(i, 1);
+			break;
 		}
 	}
 	self.showGraph();
 };
 
-// param: not dm.Beacon
+// param: not dm.Node
 ctr.prototype.onEdgeDelete = function ( p1, p2 ){
 	var self = this.context;
-	if (p1.ispl || p2.ispl){
-		pa = p1.ispl ? p1 : p2;	// place
-		pb = p1.ispl ? p2 : p1;	// non-place (beacon)
-		pa = self.findPlaceByViewCoord(pa);
-		pb = self.findBeaconByViewCoord(pb);
-		for (var i = 0; i < pa.vectors.length; i++){
-			if (pa.vectors[i] == pb){
-				pa.vectors.splice(i, 1);
-				break;
-			}
+	p1 = self.findNodeByViewCoord(p1);
+	p2 = self.findNodeByViewCoord(p2);
+	for (var i = 0; i < p1.vectors.length; i++){
+		if (p1.vectors[i] == p2){
+			p1.vectors.splice(i, 1);
+			break;
 		}
-	} else {
-		p1 = self.findBeaconByViewCoord(p1);
-		p2 = self.findBeaconByViewCoord(p2);
-		for (var i = 0; i < p1.vectors.length; i++){
-			if (p1.vectors[i] == p2){
-				p1.vectors.splice(i, 1);
-				break;
-			}
-		}
-		for (var i = 0; i < p2.vectors.length; i++){
-			if (p2.vectors[i] == p1){
-				p2.vectors.splice(i, 1);
-				break;
-			}
+	}
+	for (var i = 0; i < p2.vectors.length; i++){
+		if (p2.vectors[i] == p1){
+			p2.vectors.splice(i, 1);
+			break;
 		}
 	}
 	self.showGraph();
 };
 
-// param: not dm.Beacon
+// param: not dm.Node
 ctr.prototype.onPointUpdate = function ( p1, p2 ){
 	var self = this.context;
-	if (p1.ispl){
-		p1 = self.findPlaceByViewCoord(p1);
-	} else {
-		p1 = self.findBeaconByViewCoord(p1);
-	}
+	p1 = self.findNodeByViewCoord(p1);
 	p1.coords[0] = p2.coords[0];
 	p1.coords[1] = p2.coords[1];
 	self.showGraph();
