@@ -4,18 +4,22 @@
 ctr = function Ctr( json ){
 	this.view = new vw();
 	this.model = new dm();
+	this.sensor = new sensor();
 	this.path = null;	// array of nodes
 	this.callbacks = {
 		"context": this,
 		"nav": this.nav,
+		"navU": this.navUser,
 		"newPoint": this.onPointCreate,
 		"newEdge": this.onEdgeCreate,
 		"delPoint": this.onPointDelete,
 		"delEdge": this.onEdgeDelete,
-		"updatePoint": this.onPointUpdate
+		"updatePoint": this.onPointUpdate,
+		"loc": this.loc
 	};
-	this.currentFloor = null;
 	this.user = null;
+	// Update user location after calibration
+	this.userUpdateInterval = null;
 	// Initialization
 	this.init( json );
 };
@@ -24,6 +28,7 @@ ctr.prototype.init = function ( json ){
 	this.model.init( json );
 	this.view.init( this.callbacks );
 	this.showGraph();
+	this.sensor.start();
 }
 
 /**
@@ -124,7 +129,7 @@ ctr.prototype.comparePaths = function ( paths ){
  */
 ctr.prototype.navigate = function ( from, to ){
 	// If on same floor
-	if (from.floor == to.floor){
+	if (from.floor == to.floor){	// TODO compare current floor to to.floor
 		this.path = this.findPath( from, to );
 	} else {	// On separate floors; find elevation instead
 		// Find nearest elevation
@@ -183,8 +188,149 @@ ctr.prototype.findNodeByViewCoord = function ( p ){
 	return null;
 };
 
+ctr.prototype.ccIntersect = function ( a, b, ra, rb ){
+	var ax = a.coords[0], ay = a.coords[1],
+		bx = b.coords[0], by = b.coords[1],
+		d = Math.sqrt( Math.pow(bx - ax, 2) + Math.pow(by - ay, 2) ),
+		m, h, kx, ky, x1, x2, y1, y2;
+	if (ra + rb < d){	// circles are separate; make it 1 intersection
+		var delta = (d - ra - rb) / 2;
+		ra += delta; rb += delta;
+		m = ra;
+		h = 0;
+	} else if (d < Math.abs(ra-rb)){	// one circle is contained; make it 1 intersection
+		var delta = ( Math.abs(ra - rb) - d ) / 2;
+		if (ra < rb){
+			ra += delta; rb -= delta;
+		} else {
+			ra -= delta; rb += delta;
+		}
+		m = ra;
+		h = 0;
+	} else {	// normal intersections
+		m = (ra*ra - rb*rb + d*d) / (2*d),
+		h = Math.sqrt( ra*ra - m*m );
+	}
+	kx = ax + m/d * (bx-ax),
+	ky = ay + m/d * (by-ay);
+	x1 = kx + h * (by-ay) / d, y1 = ky - h * (bx-ax) / d,
+	x2 = kx - h * (by-ay) / d, y2 = ky + h * (bx-ax) / d;
+	return {
+		'p1x': x1,
+		'p1y': y1,
+		'p2x': x2,
+		'p2y': y2
+	};
+};
+
+ctr.prototype.determinant = function ( a, b, k ){
+	var ax = a.coords[0], ay = a.coords[1],
+		bx = b.coords[0], by = b.coords[1],
+		kx = k.coords[0], ky = k.coords[1];
+	return ((bx - ax)*(ky - ay) - (by - ay)*(kx - ax));
+};
+
+ctr.prototype.bilaterate = function (){
+
+};
+
+ctr.prototype.unilaterate = function (){
+
+};
+
+ctr.prototype.calcMean = function ( dataSet ){
+	if (dataSet.length < 5){
+		return null;
+	} else {
+		var a = dataSet;
+		// Remove possible outliers
+		a.sort(function(a,b){return a-b});
+		var q1 = a[1],
+			q3 = a[3],
+			interQRange = (q3 - q1) * 1.5,
+			innerfenceLo = q1 - interQRange,
+			innerfenceHi = q3 + interQRange;
+		if (a[0] < innerfenceLo){
+			a.splice(0, 1);
+		}
+		if (a[-1] > innerfenceHi){
+			a.splice(-1, 1);
+		}
+		// Calculate mean value
+		var sum = 0;
+		for (var i = 0; i < a.length; i++){
+			sum += a[i];
+		}
+		return sum / a.length;
+	}
+};
+
+ctr.prototype.calibrate = function (){
+	var scale = 6;	// TODO replace hardcoded scale
+	this.userUpdateInterval = null;
+	var json = {
+		'GID': -1,
+		'Coords': [0, 0],
+		'Vectors': [],
+		'Type': dm.Node.TYPE_USER,
+		'UID': 1,
+		'UserName': ""
+	},
+	r = [];
+	var record = [];
+    for (var key in this.sensor.signals) {
+        if (this.sensor.signals.hasOwnProperty(key)){
+        	record.push([ key, this.sensor.signals[key] ]);
+        }
+    }
+	if (record.length >= 3){
+		var a = this.model.findNodeByPid(record[0][0]),
+			b = this.model.findNodeByPid(record[1][0]),
+			c = this.model.findNodeByPid(record[2][0]),
+			da = this.calcMean(record[0][1].readings) * scale,
+			db = this.calcMean(record[1][1].readings) * scale,
+			dc = this.calcMean(record[2][1].readings) * scale,
+			cx = c.coords[0], cy = c.coords[1];
+		if ( this.determinant(a, b, c) == 0 ){	// three nodes are colinear
+			r = this.bilaterate();
+		} else {
+			var intersections = this.ccIntersect( a, b, da, db );
+			var	p1 = [intersections.p1x, intersections.p1y],
+				p2 = [intersections.p2x, intersections.p2y],
+				d1 = Math.sqrt( Math.pow(p1[0] - cx, 2) + Math.pow(p1[1] - cy, 2) ),
+				d2 = Math.sqrt( Math.pow(p2[0] - cx, 2) + Math.pow(p2[1] - cy, 2) ),
+				r = Math.abs(d1-dc) > Math.abs(d2-dc) ? p2 : p1,
+				drc = Math.sqrt( Math.pow(r[0] - cx, 2) + Math.pow(r[1] - cy, 2) ),
+				dAvg = ( dc + drc ) / 2,
+				m = drc - dAvg;
+			r[0] = r[0] + m/drc * (cx-r[0]);
+			r[1] = r[1] + m/drc * (cy-r[1]);
+		}
+	} else if (record.length == 2){
+		r = this.bilaterate();
+	} else if (record.length == 1){
+		r = this.unilaterate();
+	}
+	if (record.length == 0){
+		this.user = null;
+	} else {
+		json.Coords[0] = r[0]; json.Coords[1] = r[1];
+		this.user = new dm.Node( json );
+		$('#approx').css({'top':this.user.coords[1], 'left':this.user.coords[0]});
+	}
+};
+
+ctr.prototype.updateUser = function (){
+	if (this.sensor.signals.length >= 3){
+		this.calibrate();
+	} else {
+		var lastSeen = this.user;
+	}
+};
+
 // Callback; tmp
 // param: not dm.Node
+// TODO replace with floor-checking method
 ctr.prototype.nav = function ( from, to ){
 	var self = this.context;
 	from = self.findNodeByViewCoord(from);
@@ -194,6 +340,80 @@ ctr.prototype.nav = function ( from, to ){
 		throw new Error("No path found");
 	}
 	self.showNav();
+};
+
+ctr.prototype.loc = function ( from, to ){
+	var self = this.context;
+	self.calibrate();
+};
+
+
+// TODO replace with floor-checking method
+ctr.prototype.navUser = function ( to, cxt ){
+	var self = cxt == undefined ? this.context : cxt,
+		atDest = false;	// at destination
+	if (self.user == null){
+		self.calibrate();
+	}
+	// Clean up edge between user and node
+	var nlist = self.model.model.nodes;
+	var v = self.user.vectors;
+	// Clean up edges
+	for (var i = 0; i < v.length; i++){
+		var p2 = v[i];
+		for (var j = 0; j < p2.vectors.length; j++){
+			if (p2.vectors[j] == p1){
+				p2.vectors.splice(j, 1);
+				break;
+			}
+		}
+	}
+	// Find nearest node
+	ds = Number.POSITIVE_INFINITY;
+	node = null;
+	for (var i = 0; i < self.model.model.nodes.length; i++){
+		var n = self.model.model.nodes[i];
+		dsp = Math.pow(self.user.coords[0] - n.coords[0], 2) + Math.pow(self.user.coords[1] - n.coords[1], 2);
+		if ( dsp < ds){
+			ds = dsp;
+			node = n;
+		}
+	}
+	if (node != null){
+		p1 = self.user;
+		p2 = node;
+		if (!p1.isNeighbor(p2)){
+			p1.vectors.push(p2);
+			p2.vectors.push(p1);
+			self.view.newEdge( p1, p2 );
+		}
+	} else {
+		throw new Error("Cannot find nearest node for user.");
+	}
+	// Path finding
+	from = self.user;
+	to = self.findNodeByViewCoord(to);
+	self.path = self.findPath( from, to );
+	if (self.path == null){
+		throw new Error("No path found");
+	}
+	if (self.path.length == 2){	// 1 user node, 1 other node
+		var a = self.path[0], b = self.path[1];
+		dsp = Math.pow(a.coords[0] - b.coords[0]) + Math.pow(a.coords[1] - b.coords[1]);
+		if (dsp <= 4){	// within 2 feet
+			atDest = true;
+			clearInterval(self.userUpdateInterval);
+			self.userUpdateInterval = null;
+		}
+	}
+	self.showGraph();
+	self.showNav();
+	if (self.userUpdateInterval == null && !atDest){
+		self.userUpdateInterval = setInterval(function (){
+			self.updateUser();
+			self.navUser( to, self );
+		}, 1200);
+	}
 };
 
 // param: not dm.Node
@@ -211,6 +431,9 @@ ctr.prototype.onPointCreate = function ( p ){
 		json.GID = '0';
 	} else {
 		json.GID = nlist.length.toString();
+	}
+	if (p.type == dm.Node.TYPE_PHYSICAL){
+		json.PID = p.pid;
 	}
 	nlist.push( new dm.Node( json ) );
 	self.view.newPoint( p );

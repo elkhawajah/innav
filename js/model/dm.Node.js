@@ -5,7 +5,7 @@ dm.Node = function dmNode( json ){
 	dm.call(this);
 	// Graph properties; A* search
 	this.gid = json.GID;	// Graph node ID
-	this.coords = [json.Coords[0], json.Coords[1], 1];	// x, y, w;
+	this.coords = [parseFloat(json.Coords[0]), parseFloat(json.Coords[1]), 1];	// x, y, w;
 	this.vectors = json.Vectors == undefined ? [] : json.Vectors;	// Adjacency list; initialize to string IDs (GID), then convert to dm.Node
 	// f, g, h in A* heuristic pathfinding; f = g + h; g = past cost *squared*, h = future cost *squared*
 	this.f = 0;

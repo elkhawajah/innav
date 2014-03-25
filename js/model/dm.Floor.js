@@ -8,8 +8,8 @@ dm.Floor = function dmFloor( json ){
 	dm.call(this);
 	this.id = json.id;
 	this.name = json.name;
-	this.alpha = json.alpha;
-	this.scale = json.scale;	// px : meter
+	this.alpha = parseFloat(json.alpha);
+	this.scale = parseInt(json.scale);	// pxs per foot
 	// Bottom-up linking
 	this.building = null;
 };

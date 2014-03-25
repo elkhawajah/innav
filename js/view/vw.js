@@ -11,6 +11,7 @@ vw = function Vw(){
 	this.isNodeVirtual = false;
 	this.isCreatingEdge = false;
 	this.isFindingPath = false;
+	this.isNavigating = false;
 	this.isDeleting = false;
 	this.isMoving = false;
 	// View elements
@@ -21,6 +22,7 @@ vw = function Vw(){
 	// Click find path
 	this.point = {'a': null, 'b': null};
 	this.move = {'a': null, 'b': null};
+	this.destination = null;	// point for navigation
 	// Callbacks
 	this.callbacks = null;
 };
@@ -50,6 +52,7 @@ vw.prototype.init = function ( callbacks ){
 				p.type = dm.Node.TYPE_VIRTUAL;
 			} else {
 				p.type = dm.Node.TYPE_PHYSICAL;
+				p.pid = self.points.length;
 			}
 			if (!self.isDrawn(p)){
 				self.callbacks.newPoint( p );
@@ -62,17 +65,20 @@ vw.prototype.init = function ( callbacks ){
 			}
 		}
 	});
-	this.console.html('Modes: v - Virtual; p - Physical; e - Edge; f - Find; d - Delete; m - Move; c - Turn off all modes<br>');
+	var consoleHint = 'Modes: v - Virtual; p - Physical; e - Edge; f - Find; x - Delete; m - Move; n - Navigate; l - Locate; c - Turn off all modes<br>WASD to move; QR to turn<br>'
+	this.console.html(consoleHint);
 	$(document).keypress( function (event){
-		self.console.html('Modes: v - Virtual; p - Physical; e - Edge; f - Find; d - Delete; m - Move; c - Turn off all modes<br>');
+		self.console.html(consoleHint);
 		$('circle[fill="red"]').remove();
 		$('line[stroke="red"]').remove();
 		self.isCreatingNode = false;
 		self.isNodeVirtual = false;
 		self.isCreatingEdge = false;
 		self.isFindingPath = false;
+		self.isNavigating = false;
 		self.isDeleting = false;
 		self.isMoving = false;
+		var u = $('#user');
 		switch(event.which){
 			case 101: 	// e
 				self.isCreatingEdge = true;
@@ -90,7 +96,7 @@ vw.prototype.init = function ( callbacks ){
 			case 99: 	// c
 				self.console.html(self.console.html() + 'All modes are OFF.');
 				break;
-			case 100: 	// d
+			case 120: 	// x
 				self.isDeleting = true;
 				self.console.html(self.console.html() + 'Now in DELETE mode.');
 				break;
@@ -102,6 +108,55 @@ vw.prototype.init = function ( callbacks ){
 				self.isCreatingNode = true;
 				self.console.html(self.console.html() + 'Now in Physical mode.');
 				break;
+			case 110: 	// n
+				self.isNavigating = true;
+				self.console.html(self.console.html() + 'Now in Navigate mode.');
+				break;
+			case 108: 	// l
+				self.callbacks.loc();
+				break;
+			case 119: 	// w
+				setTimeout(function (){
+					u.css('top',parseInt(u.css('top'))-3);
+				}, 0);
+				break;
+			case 115: 	// s
+				setTimeout(function (){
+					u.css('top',parseInt(u.css('top'))+3);
+				}, 0);
+				break;
+			case 97: 	// a
+				setTimeout(function (){
+					u.css('left',parseInt(u.css('left'))-3);
+				}, 0);
+				break;
+			case 100: 	// d
+				setTimeout(function (){
+					u.css('left',parseInt(u.css('left'))+3);
+				}, 0);
+				break;
+			case 113: 	// q
+				var matrix = u.css('-webkit-transform'),
+					angle = null;
+				if(matrix !== 'none') {
+					var values = matrix.split('(')[1].split(')')[0].split(',');
+					var a = values[0];
+					var b = values[1];
+					angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+				} else { angle = 0; }
+				u.css('-webkit-transform', 'rotate('+(angle-5)+'deg)');
+				break;
+			case 114: 	// r
+				var matrix = u.css('-webkit-transform'),
+					angle = null;
+				if(matrix !== 'none') {
+					var values = matrix.split('(')[1].split(')')[0].split(',');
+					var a = values[0];
+					var b = values[1];
+					angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+				} else { angle = 0; }
+				u.css('-webkit-transform', 'rotate('+(angle+5)+'deg)');
+				break;
 			default:
 				self.console.html(self.console.html() + 'Invalid key.');
 				break;
@@ -111,8 +166,12 @@ vw.prototype.init = function ( callbacks ){
 
 vw.prototype.newPoint = function ( p, highlight ){
 	var color = 'black', self = this;
+	var attr = {};
 	if (p.type == dm.Node.TYPE_VIRTUAL){
 		color = 'blue';
+		attr = {fill:color, 'type':p.type};
+	} else {
+		attr = {fill:color, 'type':p.type, 'pid':p.pid};
 	}
 	if (highlight){
 		color = 'red';
@@ -121,7 +180,7 @@ vw.prototype.newPoint = function ( p, highlight ){
 		if (!highlight){
 			this.points.push(p);
 		}
-		var c = $( this.map.circle(p.coords[0], p.coords[1], 10, {fill:color, 'type':p.type}) );
+		var c = $( this.map.circle(p.coords[0], p.coords[1], 10, attr) );
 		c.on('click', function(event){
 			if (self.isDeleting){
 				self.callbacks.delPoint( p );
@@ -151,6 +210,9 @@ vw.prototype.newPoint = function ( p, highlight ){
 					self.move.a = p;
 					event.stopPropagation();
 				}
+			} else if (self.isNavigating){
+				self.destination = p;
+				self.callbacks.navU(self.destination);
 			}
 		});
 	}

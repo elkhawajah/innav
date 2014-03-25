@@ -2,129 +2,127 @@ sensor = function Sensor(){
 	this.readDataInterval = null;
 	this.signals = [];	// node PIDs
 	this.compass = {	// phone compass
-		'readings': [],
-		'mean': null
-	}
+		'readings': []
+	};
+	this.currentFloor = null;	// TODO read from signal record
+	this.user = $('#user');
 };
 
 sensor.prototype.start = function (){
-	this.readDataInterval = setInterval(this.readData, 200);
+	var self = this;
+	this.readDataInterval = setInterval(function (){
+		self.measure();
+	}, 200);
 };
 
-sensor.prototype.readData = function (){
+sensor.prototype.measure = function (){
 	// Read compass
 	var comp = this.getCompass();
 	if (comp != null){
 		this.pushData( comp, this.compass.readings );
-		this.compass.mean = this.calcMean( this.compass.readings );
 	}
 	// Get all available signal sources
-	var signals = this.getSignals();
-	if (signals.length != 0){
-		// Initialize all signal records to "not updated"
-		for (var i = 0; i < this.signals.length; i++){
-			this.signals[i].updated = false;
+	var measurements = this.getSignals();
+	// Clean up all records that are not updated since last read
+	for (var key in this.signals){
+		if (!this.signals[key].updated){
+			delete this.signals[key];
+		} else {
+			// Initialize all updated signal records to "not updated"
+			this.signals[key].updated = false;
 		}
-		// For all current sensed signals
-		for (var i = 0; i < signals.length; i++){
-			var signal = signals[i], update = false;
-			// Update current readings if that signal is already in record
-			for (var j = 0; j < this.signals.length; j++){
-				if (signal.PID == this.signals[j].PID){
-					this.pushData( signal.distance, this.signals[j].readings );
-					this.signals[j].mean = this.calcMean( this.signals[j].readings );
-					this.signals[j].updated = true;
-					update = true;
-					break;
-				}
-			}
-			// Add this source to record since it's new
-			if (!update){
-				this.signals.push({
-					'PID': signal.PID,
-					'readings': [ signal.distance ],
-					'mean': null,
-					'updated': true
-				});
+	}
+	var measurement, updateTarget;
+	// For all current sensed signals
+	for (var i = 0; i < measurements.length; i++){
+		measurement = measurements[i], updateTarget = false;
+		// Update current readings if that signal is already in record
+		for (var key in this.signals){
+			if (measurement.PID == key){
+				this.pushData( measurement.distance, this.signals[key].readings );
+				this.signals[key].updated = true;
+				updateTarget = true;
+				break;
 			}
 		}
-		// Clean up all records that are not updated since last read
-		for (var i = 0; i < this.signals.length; i++){
-			if (!this.signals[i].updated){
-				this.signals.splice(i, 1);
-				i--;
-			}
+		if (!updateTarget){
+			this.signals[measurement.PID] = {
+				'readings': [ measurement.distance ],
+				'updated': true
+			};
 		}
 	}
 };
 
 sensor.prototype.pushData = function ( data, dataSet ){
-	if (dataSet.length = 5){
-		dataSet.splice(0, 1);
-	}
-	dataSet.push(data);
+	setTimeout(function (){	// Put this in queue so the array changes exactly during each measure() call, not at some random point
+		if (dataSet.length == 5){
+			dataSet.shift();
+		}
+		dataSet.push(data);
+	}, 0);
 };
 
-sensor.prototype.calcMean = function ( dataSet ){
-	if (dataSet.length < 5){
-		return null;
-	} else {
-		var a = dataSet;
-		// Remove possible outliers
-		a.sort(function(a,b){return a-b});
-		var q1 = a[1],
-			q3 = a[3],
-			interQRange = (q3 - q1) * 1.5,
-			innerfenceLo = q1 - interQRange,
-			innerfenceHi = q3 + interQRange;
-		if (a[0] < innerfenceLo){
-			a.splice(0, 1);
-		}
-		if (a[a.length - 1] > innerfenceHi){
-			a.splice(-1, 1);
-		}
-		// Calculate mean value
-		var sum = 0;
-		for (var i = 0; i < a.length; i++){
-			sum += a[i];
-		}
-		return sum / a.length;
-	}
-};
-
+// tmp sensor measurement
 sensor.prototype.getCompass = function (){
-	var user = $('#user');
-	if (user == undefined){
+	if (this.user == undefined){
 		return null;
 	} else {
-		var filter = /rotate\((.*)\)deg)/gi;
-		var transform = user.css('webkit-transform');
-		var match = filter.exec(transform);
-		return parseFloat(match[1]);
+		var matrix = this.user.css('-webkit-transform'),
+			angle = null;
+		if(matrix !== 'none') {
+			var values = matrix.split('(')[1].split(')')[0].split(',');
+			var a = values[0];
+			var b = values[1];
+			angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+		} else { angle = 0; }
+		return angle;
 	}
 };
 
+// tmp sensor measurement
 sensor.prototype.getSignals = function (){
-	var user = $('#user'),
-		r = [],
-		dLimitSqr = Math.pow(100, 2),	// TODO replace hardcoded distance
-		scale = [10, 1];	// TODO replace hardcoded scale
-	if (user == undefined){
+	var r = [],
+		// CSS pixel has fixed 96 DPI; so 96 pixels per inch; defined as reference pixel
+		// if scale is 1/16 inch per foot, then it's 6 pixels per foot
+		// scale unit is px/ft
+		scale = 6,	// TODO replace hardcoded scale
+		dLimitSqr = Math.pow(50 * scale, 2);	// TODO replace hardcoded distance; distance in pixels
+	var randomError = function ( distance ){
+		var s = Math.random();
+		if (s < 0.5){
+			s = -1;
+		} else {
+			s = 1;
+		}
+		var range = 0;
+		if (distance >= 32){
+			range = 10;
+		} else if (distance < 32 && distance >= 3.2){
+			range = 6.5;
+		} else if (distance < 3.2){
+			range = 0.5;
+		}
+		return s * Math.random() * 0.5;
+	}
+	if (this.user == undefined){
 		return r;
 	} else {
-		var ux = parseInt(user.attr('cx')), uy = parseInt(user.attr('cy'));
-		$('circle').each(function (){
-			var self = $(this);
+		var ux = parseInt(this.user.css('left')), uy = parseInt(this.user.css('top')),
+			nodes = $('circle');
+		for (var i = 0; i < nodes.length; i++){
+			var self = $(nodes[i]);
 			if (self.attr('type') == dm.Node.TYPE_PHYSICAL){
 				var cx = parseInt(self.attr('cx')), cy = parseInt(self.attr('cy')),
 					ds = Math.pow(ux - cx, 2) + Math.pow(uy - cy, 2);
 				if ( ds <= dLimitSqr){
 					r.push({
-						'PID': self.attr('pid'),	// TODO add pid attr to view elements
-						'distance': Math.sqrt(ds)	// TODO normalize pixel distance to physical distance using scale
-					})
+						'PID': self.attr('pid'),
+						'distance': Math.sqrt(ds) / scale + randomError(ds)	// Normalize pixel distance to physical distance using scale; distance in feet
+					});
 				}
 			}
-		});
+		}
+		return r;
 	}
 };
