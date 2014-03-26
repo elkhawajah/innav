@@ -6,6 +6,7 @@ vw = function Vw(){
 	this.canvas = null;
 	this.console = null;
 	this.map = null;
+	this.u = null;;
 	// Editing status
 	this.isCreatingNode = false;
 	this.isNodeVirtual = false;
@@ -44,6 +45,7 @@ vw.prototype.init = function ( callbacks ){
 	});
 	this.canvas.svg();
 	this.map = this.canvas.svg('get');
+	this.u = document.getElementById("user");
 	this.callbacks = callbacks;
 	this.canvas.on('click', function (event){
 		if (self.isCreatingNode){
@@ -78,7 +80,6 @@ vw.prototype.init = function ( callbacks ){
 		self.isNavigating = false;
 		self.isDeleting = false;
 		self.isMoving = false;
-		var u = $('#user');
 		switch(event.which){
 			case 101: 	// e
 				self.isCreatingEdge = true;
@@ -116,27 +117,19 @@ vw.prototype.init = function ( callbacks ){
 				self.callbacks.loc();
 				break;
 			case 119: 	// w
-				setTimeout(function (){
-					u.css('top',parseInt(u.css('top'))-3);
-				}, 0);
+				self.u.style.top = (parseInt(self.u.style.top) - 3) + 'px';
 				break;
 			case 115: 	// s
-				setTimeout(function (){
-					u.css('top',parseInt(u.css('top'))+3);
-				}, 0);
+				self.u.style.top = (parseInt(self.u.style.top) + 3) + 'px';
 				break;
 			case 97: 	// a
-				setTimeout(function (){
-					u.css('left',parseInt(u.css('left'))-3);
-				}, 0);
+				self.u.style.left = (parseInt(self.u.style.left) - 3) + 'px';
 				break;
 			case 100: 	// d
-				setTimeout(function (){
-					u.css('left',parseInt(u.css('left'))+3);
-				}, 0);
+				self.u.style.left = (parseInt(self.u.style.left) + 3) + 'px';
 				break;
 			case 113: 	// q
-				var matrix = u.css('-webkit-transform'),
+				var matrix = self.u.style.transform;
 					angle = null;
 				if(matrix !== 'none') {
 					var values = matrix.split('(')[1].split(')')[0].split(',');
@@ -144,10 +137,10 @@ vw.prototype.init = function ( callbacks ){
 					var b = values[1];
 					angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
 				} else { angle = 0; }
-				u.css('-webkit-transform', 'rotate('+(angle-5)+'deg)');
+				self.u.style.transform = 'rotate('+(angle-5)+'deg)';
 				break;
 			case 114: 	// r
-				var matrix = u.css('-webkit-transform'),
+				var matrix = self.u.style.transform;
 					angle = null;
 				if(matrix !== 'none') {
 					var values = matrix.split('(')[1].split(')')[0].split(',');
@@ -155,7 +148,7 @@ vw.prototype.init = function ( callbacks ){
 					var b = values[1];
 					angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
 				} else { angle = 0; }
-				u.css('-webkit-transform', 'rotate('+(angle+5)+'deg)');
+				self.u.style.transform = 'rotate('+(angle+5)+'deg)';
 				break;
 			default:
 				self.console.html(self.console.html() + 'Invalid key.');
@@ -170,8 +163,11 @@ vw.prototype.newPoint = function ( p, highlight ){
 	if (p.type == dm.Node.TYPE_VIRTUAL){
 		color = 'blue';
 		attr = {fill:color, 'type':p.type};
-	} else {
+	} else if (p.type == dm.Node.TYPE_PHYSICAL){
 		attr = {fill:color, 'type':p.type, 'pid':p.pid};
+	} else if (p.type == dm.Node.TYPE_USER){
+		color = 'grey';
+		attr = {fill:color, 'type':p.type};
 	}
 	if (highlight){
 		color = 'red';
@@ -222,6 +218,8 @@ vw.prototype.newEdge = function ( p1, p2, highlight ){
 	var color = 'black', self = this;
 	if (p1.type == dm.Node.TYPE_VIRTUAL || p2.type == dm.Node.TYPE_VIRTUAL){
 		color = 'blue';
+	} else if (p1.type == dm.Node.TYPE_USER || p2.type == dm.Node.TYPE_USER){
+		color = 'grey';
 	}
 	if (highlight){
 		color = 'red';

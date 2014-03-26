@@ -1,18 +1,27 @@
 sensor = function Sensor(){
 	this.readDataInterval = null;
-	this.signals = [];	// node PIDs
+	this.signals = {};	// node PIDs
 	this.compass = {	// phone compass
 		'readings': []
 	};
 	this.currentFloor = null;	// TODO read from signal record
-	this.user = $('#user');
+	this.u = document.getElementById("user");
 };
 
 sensor.prototype.start = function (){
 	var self = this;
 	this.readDataInterval = setInterval(function (){
 		self.measure();
-	}, 200);
+	}, 100);
+};
+
+sensor.prototype.stop = function (){
+	clearInterval(this.readDataInterval);
+	this.readDataInterval = null;
+};
+
+sensor.prototype.setNodes = function ( nodeArray ){
+	this.nodes = nodeArray;
 };
 
 sensor.prototype.measure = function (){
@@ -55,8 +64,8 @@ sensor.prototype.measure = function (){
 };
 
 sensor.prototype.pushData = function ( data, dataSet ){
-	setTimeout(function (){	// Put this in queue so the array changes exactly during each measure() call, not at some random point
-		if (dataSet.length == 5){
+	setTimeout(function(){
+		if (dataSet.length == 10){
 			dataSet.shift();
 		}
 		dataSet.push(data);
@@ -68,7 +77,7 @@ sensor.prototype.getCompass = function (){
 	if (this.user == undefined){
 		return null;
 	} else {
-		var matrix = this.user.css('-webkit-transform'),
+		var matrix = this.u.style.transform;
 			angle = null;
 		if(matrix !== 'none') {
 			var values = matrix.split('(')[1].split(')')[0].split(',');
@@ -105,19 +114,20 @@ sensor.prototype.getSignals = function (){
 		}
 		return s * Math.random() * 0.5;
 	}
-	if (this.user == undefined){
+	var self = this;
+	if (this.u == undefined){
+		return r;
+	} else if (this.nodes.length == 0){
 		return r;
 	} else {
-		var ux = parseInt(this.user.css('left')), uy = parseInt(this.user.css('top')),
-			nodes = $('circle');
-		for (var i = 0; i < nodes.length; i++){
-			var self = $(nodes[i]);
-			if (self.attr('type') == dm.Node.TYPE_PHYSICAL){
-				var cx = parseInt(self.attr('cx')), cy = parseInt(self.attr('cy')),
+		var ux = parseInt(this.u.style.left), uy = parseInt(this.u.style.top);
+		for (var i = 0; i < this.nodes.length; i++){
+			if (this.nodes[i].type == dm.Node.TYPE_PHYSICAL){
+				var cx = this.nodes[i].coords[0], cy = this.nodes[i].coords[1],
 					ds = Math.pow(ux - cx, 2) + Math.pow(uy - cy, 2);
 				if ( ds <= dLimitSqr){
 					r.push({
-						'PID': self.attr('pid'),
+						'PID': this.nodes[i].pid,
 						'distance': Math.sqrt(ds) / scale + randomError(ds)	// Normalize pixel distance to physical distance using scale; distance in feet
 					});
 				}

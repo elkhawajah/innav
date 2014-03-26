@@ -15,19 +15,23 @@ ctr = function Ctr( json ){
 		"delPoint": this.onPointDelete,
 		"delEdge": this.onEdgeDelete,
 		"updatePoint": this.onPointUpdate,
-		"loc": this.loc
+		"loc": this.loc,
+		"pauseSensor": this.pauseSensor,
+		"resumeSensor": this.resumeSensor
 	};
 	this.user = null;
 	// Update user location after calibration
 	this.userUpdateInterval = null;
 	// Initialization
 	this.init( json );
+	this.approx = document.getElementById("approx");
 };
 
 ctr.prototype.init = function ( json ){
 	this.model.init( json );
 	this.view.init( this.callbacks );
 	this.showGraph();
+	this.sensor.setNodes( this.model.model.nodes );
 	this.sensor.start();
 }
 
@@ -239,17 +243,18 @@ ctr.prototype.unilaterate = function (){
 };
 
 ctr.prototype.calcMean = function ( dataSet ){
-	if (dataSet.length < 5){
+	if (dataSet.length < 10){
 		return null;
 	} else {
 		var a = dataSet;
 		// Remove possible outliers
 		a.sort(function(a,b){return a-b});
-		var q1 = a[1],
-			q3 = a[3],
+		var q1 = ( a[2] + a[3] ) / 2,
+			q3 = ( a[6] + a[7] ) / 2,
 			interQRange = (q3 - q1) * 1.5,
 			innerfenceLo = q1 - interQRange,
 			innerfenceHi = q3 + interQRange;
+		a = a.slice(2, 8);
 		if (a[0] < innerfenceLo){
 			a.splice(0, 1);
 		}
@@ -278,11 +283,9 @@ ctr.prototype.calibrate = function (){
 	},
 	r = [];
 	var record = [];
-    for (var key in this.sensor.signals) {
-        if (this.sensor.signals.hasOwnProperty(key)){
-        	record.push([ key, this.sensor.signals[key] ]);
-        }
-    }
+	for (var key in this.sensor.signals) {
+		record.push([ key, this.sensor.signals[key] ]);
+	}
 	if (record.length >= 3){
 		var a = this.model.findNodeByPid(record[0][0]),
 			b = this.model.findNodeByPid(record[1][0]),
@@ -316,17 +319,62 @@ ctr.prototype.calibrate = function (){
 	} else {
 		json.Coords[0] = r[0]; json.Coords[1] = r[1];
 		this.user = new dm.Node( json );
-		$('#approx').css({'top':this.user.coords[1], 'left':this.user.coords[0]});
+		this.approx.style.left = this.user.coords[0] + 'px';
+		this.approx.style.top = this.user.coords[1] + 'px';
 	}
 };
 
 ctr.prototype.updateUser = function (){
-	if (this.sensor.signals.length >= 3){
+	var size = Object.keys(this.sensor.signals).length;
+	if (size >= 3){
 		this.calibrate();
 	} else {
 		var lastSeen = this.user;
 	}
 };
+
+ctr.prototype.navUser2 = function ( to ){
+	var atDest = false;	// at destination
+	// Clean up edge between user and node
+	this.user.vectors = [];
+	// Find nearest node
+	ds = Number.POSITIVE_INFINITY;
+	node = null;
+	for (var i = 0; i < this.model.model.nodes.length; i++){
+		var n = this.model.model.nodes[i];
+		dsp = Math.pow(this.user.coords[0] - n.coords[0], 2) + Math.pow(this.user.coords[1] - n.coords[1], 2);
+		if ( dsp < ds){
+			ds = dsp;
+			node = n;
+		}
+	}
+	if (node != null){
+		if (!this.user.isNeighbor(node)){
+			this.user.vectors.push(node);
+		}
+	} else {
+		throw new Error("Cannot find nearest node for user.");
+	}
+	// Path finding
+	from = this.user;
+	to = this.findNodeByViewCoord(to);
+	this.path = this.findPath( from, to );
+	if (this.path == null){
+		throw new Error("No path found");
+	}
+	if (this.path.length == 2){	// 1 user node, 1 other node
+		var a = this.path[0], b = this.path[1];
+		dsp = Math.pow(a.coords[0] - b.coords[0]) + Math.pow(a.coords[1] - b.coords[1]);
+		if (dsp <= 6.25){	// within 2.5 feet
+			atDest = true;
+			clearInterval(this.userUpdateInterval);
+			this.userUpdateInterval = null;
+		}
+	}
+	if (atDest){
+		console.log("You are arrived!");
+	}
+}
 
 // Callback; tmp
 // param: not dm.Node
@@ -343,77 +391,20 @@ ctr.prototype.nav = function ( from, to ){
 };
 
 ctr.prototype.loc = function ( from, to ){
-	var self = this.context;
-	self.calibrate();
+	this.context.calibrate();
 };
-
 
 // TODO replace with floor-checking method
 ctr.prototype.navUser = function ( to, cxt ){
-	var self = cxt == undefined ? this.context : cxt,
-		atDest = false;	// at destination
+	var self = this.context;
 	if (self.user == null){
 		self.calibrate();
 	}
-	// Clean up edge between user and node
-	var nlist = self.model.model.nodes;
-	var v = self.user.vectors;
-	// Clean up edges
-	for (var i = 0; i < v.length; i++){
-		var p2 = v[i];
-		for (var j = 0; j < p2.vectors.length; j++){
-			if (p2.vectors[j] == p1){
-				p2.vectors.splice(j, 1);
-				break;
-			}
-		}
-	}
-	// Find nearest node
-	ds = Number.POSITIVE_INFINITY;
-	node = null;
-	for (var i = 0; i < self.model.model.nodes.length; i++){
-		var n = self.model.model.nodes[i];
-		dsp = Math.pow(self.user.coords[0] - n.coords[0], 2) + Math.pow(self.user.coords[1] - n.coords[1], 2);
-		if ( dsp < ds){
-			ds = dsp;
-			node = n;
-		}
-	}
-	if (node != null){
-		p1 = self.user;
-		p2 = node;
-		if (!p1.isNeighbor(p2)){
-			p1.vectors.push(p2);
-			p2.vectors.push(p1);
-			self.view.newEdge( p1, p2 );
-		}
-	} else {
-		throw new Error("Cannot find nearest node for user.");
-	}
-	// Path finding
-	from = self.user;
-	to = self.findNodeByViewCoord(to);
-	self.path = self.findPath( from, to );
-	if (self.path == null){
-		throw new Error("No path found");
-	}
-	if (self.path.length == 2){	// 1 user node, 1 other node
-		var a = self.path[0], b = self.path[1];
-		dsp = Math.pow(a.coords[0] - b.coords[0]) + Math.pow(a.coords[1] - b.coords[1]);
-		if (dsp <= 4){	// within 2 feet
-			atDest = true;
-			clearInterval(self.userUpdateInterval);
-			self.userUpdateInterval = null;
-		}
-	}
-	self.showGraph();
-	self.showNav();
-	if (self.userUpdateInterval == null && !atDest){
-		self.userUpdateInterval = setInterval(function (){
-			self.updateUser();
-			self.navUser( to, self );
-		}, 1200);
-	}
+	self.navUser2( to );
+	self.userUpdateInterval = setInterval(function (){
+		self.updateUser();
+		self.navUser2( to );
+	}, 1200);
 };
 
 // param: not dm.Node
