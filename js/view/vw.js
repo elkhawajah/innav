@@ -129,26 +129,24 @@ vw.prototype.init = function ( callbacks ){
 				self.u.style.left = (parseInt(self.u.style.left) + 3) + 'px';
 				break;
 			case 113: 	// q
-				var matrix = self.u.style.transform;
+				var matrix = self.u.style.webkitTransform,
 					angle = null;
 				if(matrix !== 'none') {
-					var values = matrix.split('(')[1].split(')')[0].split(',');
-					var a = values[0];
-					var b = values[1];
-					angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+					var value = matrix.match(/rotate\((.+)deg\)/i);
+					angle = parseInt(value[1]);
 				} else { angle = 0; }
-				self.u.style.transform = 'rotate('+(angle-5)+'deg)';
+				angle -= 5;
+				self.u.style.webkitTransform = 'rotate('+angle+'deg)';
 				break;
 			case 114: 	// r
-				var matrix = self.u.style.transform;
+				var matrix = self.u.style.webkitTransform,
 					angle = null;
 				if(matrix !== 'none') {
-					var values = matrix.split('(')[1].split(')')[0].split(',');
-					var a = values[0];
-					var b = values[1];
-					angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+					var value = matrix.match(/rotate\((.+)deg\)/i);
+					angle = parseInt(value[1]);
 				} else { angle = 0; }
-				self.u.style.transform = 'rotate('+(angle+5)+'deg)';
+				angle += 5;
+				self.u.style.webkitTransform = 'rotate('+angle+'deg)';
 				break;
 			default:
 				self.console.html(self.console.html() + 'Invalid key.');

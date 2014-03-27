@@ -26,6 +26,7 @@ dm.Node = function dmNode( json ){
 	// Optional node properties
 	this.uid = json.UID;	// User ID
 	this.userName = json.UserName;
+	this.userAlpha = 0;
 };
 
 oo.inherit( dm.Node, dm );

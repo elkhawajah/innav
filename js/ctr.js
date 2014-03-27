@@ -235,11 +235,15 @@ ctr.prototype.determinant = function ( a, b, k ){
 };
 
 ctr.prototype.bilaterate = function (){
-
+	// Update user alpha
+	this.user.userAlpha = this.calcMean(this.sensor.compass.readings);
+	this.approx.style.webkitTransform = 'rotate('+this.user.userAlpha+'deg)';
 };
 
 ctr.prototype.unilaterate = function (){
-
+	// Update user alpha
+	this.user.userAlpha = this.calcMean(this.sensor.compass.readings);
+	this.approx.style.webkitTransform = 'rotate('+this.user.userAlpha+'deg)';
 };
 
 ctr.prototype.calcMean = function ( dataSet ){
@@ -247,8 +251,11 @@ ctr.prototype.calcMean = function ( dataSet ){
 		return null;
 	} else {
 		var a = dataSet;
-		// Remove possible outliers
 		a.sort(function(a,b){return a-b});
+		// Return only median, since it doesn't seem to make a difference
+		return (a[4] + a[5]) / 2;
+		/*
+		// Remove possible outliers
 		var q1 = ( a[2] + a[3] ) / 2,
 			q3 = ( a[6] + a[7] ) / 2,
 			interQRange = (q3 - q1) * 1.5,
@@ -267,6 +274,7 @@ ctr.prototype.calcMean = function ( dataSet ){
 			sum += a[i];
 		}
 		return sum / a.length;
+		*/
 	}
 };
 
@@ -279,7 +287,8 @@ ctr.prototype.calibrate = function (){
 		'Vectors': [],
 		'Type': dm.Node.TYPE_USER,
 		'UID': 1,
-		'UserName': ""
+		'UserName': "",
+		'userAlpha': 0
 	},
 	r = [];
 	var record = [];
@@ -315,21 +324,29 @@ ctr.prototype.calibrate = function (){
 		r = this.unilaterate();
 	}
 	if (record.length == 0){
-		this.user = null;
+		return null;
 	} else {
 		json.Coords[0] = r[0]; json.Coords[1] = r[1];
-		this.user = new dm.Node( json );
-		this.approx.style.left = this.user.coords[0] + 'px';
-		this.approx.style.top = this.user.coords[1] + 'px';
+		return json;
 	}
 };
 
 ctr.prototype.updateUser = function (){
-	var size = Object.keys(this.sensor.signals).length;
+	var size = Object.keys(this.sensor.signals).length,
+		lastSeen = this.user;
+	// Update user alpha
+	this.user.userAlpha = this.calcMean(this.sensor.compass.readings);
+	this.approx.style.webkitTransform = 'rotate('+this.user.userAlpha+'deg)';
+	this.approx.style.left = this.user.coords[0] + 'px';
+	this.approx.style.top = this.user.coords[1] + 'px';
 	if (size >= 3){
-		this.calibrate();
+		newNode = new dm.Node( this.calibrate() );
 	} else {
-		var lastSeen = this.user;
+		newNode = null;
+	}
+	var nx = newNode.coords[0], ny = newNode.coords[1], ox = lastSeen.coords[0], oy = lastSeen.coords[1];
+	if (Math.pow(nx-ox, 2) + Math.pow(ny-oy, 2) >= 6.25){	// ignore distance change within 1 step, 2.5 feet
+		this.user = newNode;
 	}
 };
 
@@ -343,7 +360,7 @@ ctr.prototype.navUser2 = function ( to ){
 	for (var i = 0; i < this.model.model.nodes.length; i++){
 		var n = this.model.model.nodes[i];
 		dsp = Math.pow(this.user.coords[0] - n.coords[0], 2) + Math.pow(this.user.coords[1] - n.coords[1], 2);
-		if ( dsp < ds){
+		if ( dsp < ds && dsp >= 9){	// outside 3 feet
 			ds = dsp;
 			node = n;
 		}
@@ -398,8 +415,12 @@ ctr.prototype.loc = function ( from, to ){
 ctr.prototype.navUser = function ( to, cxt ){
 	var self = this.context;
 	if (self.user == null){
-		self.calibrate();
+		self.user = new dm.Node(self.calibrate());
 	}
+
+	self.approx.style.left = self.user.coords[0] + 'px';
+	self.approx.style.top = self.user.coords[1] + 'px';
+
 	self.navUser2( to );
 	self.userUpdateInterval = setInterval(function (){
 		self.updateUser();

@@ -74,16 +74,14 @@ sensor.prototype.pushData = function ( data, dataSet ){
 
 // tmp sensor measurement
 sensor.prototype.getCompass = function (){
-	if (this.user == undefined){
+	if (this.u == undefined){
 		return null;
 	} else {
-		var matrix = this.u.style.transform;
+		var matrix = this.u.style.webkitTransform,
 			angle = null;
 		if(matrix !== 'none') {
-			var values = matrix.split('(')[1].split(')')[0].split(',');
-			var a = values[0];
-			var b = values[1];
-			angle = Math.round(Math.atan2(b, a) * (180/Math.PI));
+			var value = matrix.match(/rotate\((.+)deg\)/i);
+			angle = parseInt(value[1]);
 		} else { angle = 0; }
 		return angle;
 	}
@@ -97,24 +95,35 @@ sensor.prototype.getSignals = function (){
 		// scale unit is px/ft
 		scale = 6,	// TODO replace hardcoded scale
 		dLimitSqr = Math.pow(50 * scale, 2);	// TODO replace hardcoded distance; distance in pixels
-	var randomError = function ( distance ){
+	var randomError = function ( distance ){	// Gaussian random number
+		var mu = distance, sigma, y;
+		if (mu >= 32){
+			sigma = 5;
+		} else if (mu < 32 && mu >= 6.5){
+			sigma = 3.25;
+		} else if (mu < 6.5 && mu >= 3.2){
+			sigma = 0.25;
+		} else {
+			sigma = 0.095;
+		}
+		// convert to Gaussian distribution
+		var x1, x2, w, y1, y2;
+		do {
+			x1 = 2.0 * Math.random() - 1.0;
+			x2 = 2.0 * Math.random() - 1.0;
+			w = x1 * x1 + x2 * x2;
+		} while ( w >= 1.0 );
+		w = Math.sqrt( (-2.0 * Math.log( w ) ) / w );
+		y1 = x1 * w;
+		y2 = x2 * w;
 		var s = Math.random();
 		if (s < 0.5){
-			s = -1;
+			y = y1;
 		} else {
-			s = 1;
+			y = y2;
 		}
-		var range = 0;
-		if (distance >= 32){
-			range = 10;
-		} else if (distance < 32 && distance >= 3.2){
-			range = 6.5;
-		} else if (distance < 3.2){
-			range = 0.5;
-		}
-		return s * Math.random() * 0.5;
-	}
-	var self = this;
+		return y * sigma + mu;
+	};
 	if (this.u == undefined){
 		return r;
 	} else if (this.nodes.length == 0){
@@ -128,7 +137,7 @@ sensor.prototype.getSignals = function (){
 				if ( ds <= dLimitSqr){
 					r.push({
 						'PID': this.nodes[i].pid,
-						'distance': Math.sqrt(ds) / scale + randomError(ds)	// Normalize pixel distance to physical distance using scale; distance in feet
+						'distance': randomError(Math.sqrt(ds) / scale)	// Normalize pixel distance to physical distance using scale; distance in feet
 					});
 				}
 			}
