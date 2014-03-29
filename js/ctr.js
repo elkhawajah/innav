@@ -22,9 +22,16 @@ ctr = function Ctr( json ){
 	this.user = null;
 	// Update user location after calibration
 	this.userUpdateInterval = null;
+	// n-lateration record
+	this.biRecord = null;
+	this.biNeedDecision = true;
 	// Initialization
 	this.init( json );
+	// DOM
 	this.approx = document.getElementById("approx");
+	this.u = document.getElementById("user");
+	this.guideUpper = document.getElementById("guideUpper");
+	this.guideLower = document.getElementById("guideLower");
 };
 
 ctr.prototype.init = function ( json ){
@@ -231,19 +238,7 @@ ctr.prototype.determinant = function ( a, b, k ){
 	var ax = a.coords[0], ay = a.coords[1],
 		bx = b.coords[0], by = b.coords[1],
 		kx = k.coords[0], ky = k.coords[1];
-	return ((bx - ax)*(ky - ay) - (by - ay)*(kx - ax));
-};
-
-ctr.prototype.bilaterate = function (){
-	// Update user alpha
-	this.user.userAlpha = this.calcMean(this.sensor.compass.readings);
-	this.approx.style.webkitTransform = 'rotate('+this.user.userAlpha+'deg)';
-};
-
-ctr.prototype.unilaterate = function (){
-	// Update user alpha
-	this.user.userAlpha = this.calcMean(this.sensor.compass.readings);
-	this.approx.style.webkitTransform = 'rotate('+this.user.userAlpha+'deg)';
+	return (bx - ax)*(ky - ay) - (-(by - ay)*(kx - ax) );	// extra negation since screen top-left is (0,0)
 };
 
 ctr.prototype.calcMean = function ( dataSet ){
@@ -254,33 +249,138 @@ ctr.prototype.calcMean = function ( dataSet ){
 		a.sort(function(a,b){return a-b});
 		// Return only median, since it doesn't seem to make a difference
 		return (a[4] + a[5]) / 2;
-		/*
-		// Remove possible outliers
-		var q1 = ( a[2] + a[3] ) / 2,
-			q3 = ( a[6] + a[7] ) / 2,
-			interQRange = (q3 - q1) * 1.5,
-			innerfenceLo = q1 - interQRange,
-			innerfenceHi = q3 + interQRange;
-		a = a.slice(2, 8);
-		if (a[0] < innerfenceLo){
-			a.splice(0, 1);
+	}
+};
+
+ctr.prototype.trilaterate = function (){
+	var r = {'x':null, 'y':null}, record = [], scale = 6;
+	for (var key in this.sensor.signals) {
+		record.push([ key, this.sensor.signals[key] ]);
+	}
+	var a = this.model.findNodeByPid(record[0][0]),
+		b = this.model.findNodeByPid(record[1][0]),
+		c = this.model.findNodeByPid(record[2][0]),
+		da = this.calcMean(record[0][1].readings) * scale,
+		db = this.calcMean(record[1][1].readings) * scale,
+		dc = this.calcMean(record[2][1].readings) * scale,
+		cx = c.coords[0], cy = c.coords[1];
+	if ( this.determinant(a, b, c) == 0 ){	// three nodes are colinear
+		r = this.bilaterate();
+	} else {
+		var intersections = this.ccIntersect( a, b, da, db );
+		var	p1 = {'x':intersections.p1x, 'y':intersections.p1y},
+			p2 = {'x':intersections.p2x, 'y':intersections.p2y},
+			d1 = Math.sqrt( Math.pow(p1.x - cx, 2) + Math.pow(p1.y - cy, 2) ),
+			d2 = Math.sqrt( Math.pow(p2.x - cx, 2) + Math.pow(p2.y - cy, 2) ),
+			r = Math.abs(d1-dc) > Math.abs(d2-dc) ? p2 : p1,	// pick the one closer to third measurement
+			drc = Math.sqrt( Math.pow(r.x - cx, 2) + Math.pow(r.y - cy, 2) ),
+			dAvg = ( dc + drc ) / 2,
+			m = drc - dAvg;
+		// approximate location by taking average with the third measurement
+		r.x = r.x + m/drc * (cx-r.x);
+		r.y = r.y + m/drc * (cy-r.y);
+		this.biNeedDecision = false;
+	}
+	return r;
+};
+
+ctr.prototype.bilaterate = function (){
+	// Find user alpha
+	var uAlpha = this.calcMean(this.sensor.compass.readings);
+	var record = [], scale = 6;
+	for (var key in this.sensor.signals) {
+		record.push([ key, this.sensor.signals[key] ]);
+	}
+	if (this.biNeedDecision){	// no user location yet
+		var a = this.model.findNodeByPid(record[0][0]),
+			b = this.model.findNodeByPid(record[1][0]),
+			da = this.calcMean(record[0][1].readings) * scale,
+			db = this.calcMean(record[1][1].readings) * scale,
+			ax = a.coords[0], ay = a.coords[1], bx = b.coords[0], by = b.coords[1],
+			d = Math.sqrt( Math.pow(bx-ax, 2) + Math.pow(by-ay, 2) ),
+			vectorAlpha = Math.asin( (by - ay) / d ) * 180 / Math.PI;
+		var intersections = this.ccIntersect( a, b, da, db );
+		var	p1 = {'coords':[intersections.p1x, intersections.p1y]},
+			p2 = {'coords':[intersections.p2x, intersections.p2y]};
+		if (this.determinant(a,b,p1) == 0){	// only 1 intersection
+			return {'x':p1.coords[0],'y':p1.coords[1]};
+		} else {
+			if (this.biRecord == null){	// no previous 2-intersections record
+				// point them to the left of vector AB
+				theta = vectorAlpha - 90;
+				delta = theta - uAlpha;
+				if (Math.abs(delta) > 15){
+					var s = delta > 0 ? "CLOCKWISE" : "COUNTER-CLOCKWISE";
+					console.log("Please turn " + Math.round(delta) + " degrees " + s + " and walk a few steps.");
+				} else {
+					this.biRecord = {
+						'a':a, 'b':b,
+						'da':da, 'db':db
+					};
+				}
+			} else {
+				//  if they are moving left, and:
+					// a) if they are leaving the vector, point on the left is the user's location;
+					// b) if they are approaching the vector, point on the right is the user's location
+				var changed = false,
+					aO = this.biRecord.a, bO = this.biRecord.b,
+					daO = this.biRecord.da, dbO = this.biRecord.db,
+					deltaA = da - daO, deltaB = db - dbO;
+				// Analyze the new measurements
+				changed = (Math.abs(deltaA) >= 2.5 * scale) || (Math.abs(deltaB) >= 2.5 * scale); // change is more than one step
+				if (changed){
+					console.log("OK");
+					// recalculate intersections to take the extra few steps into account
+					intersections = this.ccIntersect( a, b, da, db );
+					p1 = {'coords':[intersections.p1x, intersections.p1y]};
+					p2 = {'coords':[intersections.p2x, intersections.p2y]};
+					var pL = this.determinant(a,b,p1) > 0 ? p1 : p2,
+						pR = this.determinant(a,b,p1) < 0 ? p1 : p2;
+					if (deltaA > 0 && deltaB > 0){	// leaving
+						this.biNeedDecision = false;
+						return {'x':pL.coords[0],'y':pL.coords[1]};
+					} else if (deltaA < 0 && deltaB < 0){	// approaching
+						this.biNeedDecision = false;
+						return {'x':pR.coords[0],'y':pR.coords[1]};
+					} else {
+						return {'x':pL.coords[0],'y':pL.coords[1]};	// arbitrarily return a point so it's not null
+					}
+				} else {
+					console.log("Please walk a few more steps");
+				}
+			}
+			return {'x':p1.coords[0],'y':p1.coords[1]};	// arbitrarily return a point so it's not null
 		}
-		if (a[-1] > innerfenceHi){
-			a.splice(-1, 1);
+	} else {	// only needs to transform user location
+		var a = this.model.findNodeByPid(record[0][0]),
+			b = this.model.findNodeByPid(record[1][0]),
+			da = this.calcMean(record[0][1].readings) * scale,
+			db = this.calcMean(record[1][1].readings) * scale,
+			u = [Math.cos(uAlpha * Math.PI / 180), Math.sin(uAlpha * Math.PI / 180)];
+		// find the two new intersectoins given the two new signal sources
+		var intersections = this.ccIntersect( a, b, da, db ),
+			p1 = [intersections.p1x, intersections.p1y],
+			p2 = [intersections.p2x, intersections.p2y],
+			// find the point that's closer to the user vector
+			Up1 = [p1[0]-this.user.coords[0], p1[1]-this.user.coords[1]],
+			Up2 = [p2[0]-this.user.coords[0], p2[1]-this.user.coords[1]],
+			m_p1 = Math.sqrt(Up1[0]*Up1[0]+Up1[1]*Up1[1]),
+			m_p2 = Math.sqrt(Up2[0]*Up2[0]+Up2[1]*Up2[1]),
+			dotProduct1Sign = ( Up1[0]*u[0] + Up1[1]*u[1] ) >= 0,
+			dotProduct2Sign = ( Up2[0]*u[0] + Up2[1]*u[1] ) >= 0;
+		if (dotProduct1Sign == dotProduct2Sign){	// two points on the same direction, return the closer one
+			if (m_p1 < m_p2){ return {'x':p1[0],'y':p1[1]};
+				} else { return {'x':p2[0],'y':p2[1]}; }
+		} else {	// different direction, return the one with same direction
+			if (dotProduct1Sign){ return {'x':p1[0],'y':p1[1]};
+				} else { return {'x':p2[0],'y':p2[1]}; }
 		}
-		// Calculate mean value
-		var sum = 0;
-		for (var i = 0; i < a.length; i++){
-			sum += a[i];
-		}
-		return sum / a.length;
-		*/
 	}
 };
 
 ctr.prototype.calibrate = function (){
 	var scale = 6;	// TODO replace hardcoded scale
-	this.userUpdateInterval = null;
+	var lastSeen = this.user;
 	var json = {
 		'GID': -1,
 		'Coords': [0, 0],
@@ -290,106 +390,103 @@ ctr.prototype.calibrate = function (){
 		'UserName': "",
 		'userAlpha': 0
 	},
-	r = [];
-	var record = [];
-	for (var key in this.sensor.signals) {
-		record.push([ key, this.sensor.signals[key] ]);
-	}
-	if (record.length >= 3){
-		var a = this.model.findNodeByPid(record[0][0]),
-			b = this.model.findNodeByPid(record[1][0]),
-			c = this.model.findNodeByPid(record[2][0]),
-			da = this.calcMean(record[0][1].readings) * scale,
-			db = this.calcMean(record[1][1].readings) * scale,
-			dc = this.calcMean(record[2][1].readings) * scale,
-			cx = c.coords[0], cy = c.coords[1];
-		if ( this.determinant(a, b, c) == 0 ){	// three nodes are colinear
-			r = this.bilaterate();
-		} else {
-			var intersections = this.ccIntersect( a, b, da, db );
-			var	p1 = [intersections.p1x, intersections.p1y],
-				p2 = [intersections.p2x, intersections.p2y],
-				d1 = Math.sqrt( Math.pow(p1[0] - cx, 2) + Math.pow(p1[1] - cy, 2) ),
-				d2 = Math.sqrt( Math.pow(p2[0] - cx, 2) + Math.pow(p2[1] - cy, 2) ),
-				r = Math.abs(d1-dc) > Math.abs(d2-dc) ? p2 : p1,
-				drc = Math.sqrt( Math.pow(r[0] - cx, 2) + Math.pow(r[1] - cy, 2) ),
-				dAvg = ( dc + drc ) / 2,
-				m = drc - dAvg;
-			r[0] = r[0] + m/drc * (cx-r[0]);
-			r[1] = r[1] + m/drc * (cy-r[1]);
-		}
-	} else if (record.length == 2){
+	r = null;
+	var size = Object.keys(this.sensor.signals).length;
+	if (size >= 3){
+		r = this.trilaterate();
+	} else if (size == 2){
 		r = this.bilaterate();
-	} else if (record.length == 1){
-		r = this.unilaterate();
+	} else if (size <= 1){
+		console.log("WARNING: Not enough signal sources.");
 	}
-	if (record.length == 0){
-		return null;
+	if (r != null){
+		json.userAlpha = this.calcMean(this.sensor.compass.readings);
+		json.Coords[0] = r.x; json.Coords[1] = r.y;
+		var newNode = new dm.Node( json );
+		this.user = newNode;
+		this.approx.style.webkitTransform = 'rotate('+(this.user.userAlpha+90)+'deg)';
+		this.approx.style.left = this.user.coords[0] + 'px';
+		this.approx.style.top = this.user.coords[1] + 'px';
 	} else {
-		json.Coords[0] = r[0]; json.Coords[1] = r[1];
-		return json;
+		console.log("WARNING: Unable to determine location.");
 	}
 };
 
-ctr.prototype.updateUser = function (){
-	var size = Object.keys(this.sensor.signals).length,
-		lastSeen = this.user;
-	// Update user alpha
-	this.user.userAlpha = this.calcMean(this.sensor.compass.readings);
-	this.approx.style.webkitTransform = 'rotate('+this.user.userAlpha+'deg)';
-	this.approx.style.left = this.user.coords[0] + 'px';
-	this.approx.style.top = this.user.coords[1] + 'px';
-	if (size >= 3){
-		newNode = new dm.Node( this.calibrate() );
-	} else {
-		newNode = null;
-	}
-	var nx = newNode.coords[0], ny = newNode.coords[1], ox = lastSeen.coords[0], oy = lastSeen.coords[1];
-	if (Math.pow(nx-ox, 2) + Math.pow(ny-oy, 2) >= 6.25){	// ignore distance change within 1 step, 2.5 feet
-		this.user = newNode;
-	}
+ctr.prototype.recalibrate = function (){
+	clearInterval(this.userUpdateInterval);
+	this.user = null;
+	this.biRecord = null;
+	this.biNeedDecision = true;
+	var self = this, to = self.path[-1];
+	this.userUpdateInterval = setInterval(function (){
+		self.calibrate();
+		self.navUser2( to );
+	}, 1100);
 };
 
 ctr.prototype.navUser2 = function ( to ){
-	var atDest = false;	// at destination
-	// Clean up edge between user and node
-	this.user.vectors = [];
-	// Find nearest node
-	ds = Number.POSITIVE_INFINITY;
-	node = null;
-	for (var i = 0; i < this.model.model.nodes.length; i++){
-		var n = this.model.model.nodes[i];
-		dsp = Math.pow(this.user.coords[0] - n.coords[0], 2) + Math.pow(this.user.coords[1] - n.coords[1], 2);
-		if ( dsp < ds && dsp >= 9){	// outside 3 feet
-			ds = dsp;
-			node = n;
+	if (!this.biNeedDecision){
+		var scale = 6;
+		// Find nearest k node
+		var k = 3, neighbors = [], paths = [];
+		for (var i = 0; i < this.model.model.nodes.length; i++){
+			var n = this.model.model.nodes[i],
+				dsp = Math.pow(n.coords[0] - this.user.coords[0], 2) + Math.pow(n.coords[1] - this.user.coords[1], 2);
+			neighbors.push([dsp, n]);
 		}
-	}
-	if (node != null){
-		if (!this.user.isNeighbor(node)){
-			this.user.vectors.push(node);
+		neighbors.sort(function(a,b){return a[0]-b[0]});
+		neighbors = neighbors.slice(0, k);
+		for (var i = 0; i < k; i++){
+			// Clean up edge between user and node
+			this.user.vectors = [];
+			this.user.vectors.push(neighbors[i][1]);
+			// Path finding
+			from = this.user;
+			to = this.findNodeByViewCoord(to);
+			paths.push( this.findPath( from, to ) );
+		}
+		this.path = this.comparePaths(paths);
+		if (this.path == null){
+			throw new Error("No path found");
+		} else if (this.path.length > 2){
+			var a = this.path[0], b = this.path[1],
+				dsp = Math.pow(a.coords[0] - b.coords[0], 2) + Math.pow(a.coords[1] - b.coords[1], 2);
+			if (dsp <= 6.25*scale*scale){
+				this.path.splice(1,1);
+			}
+		}
+		this.guideLower.style.opacity = "1";
+		if (this.path.length == 2){	// 1 user node, 1 other node
+			var a = this.path[0], b = this.path[1],
+			dsp = Math.pow(a.coords[0] - b.coords[0], 2) + Math.pow(a.coords[1] - b.coords[1], 2);
+			if (dsp <= 6.25*scale*scale){	// within 2.5 feet
+				console.log("You are arrived!");
+				this.guideLower.style.opacity = "0";
+				this.guideUpper.style.opacity = "0";
+				clearInterval(this.userUpdateInterval);
+				this.userUpdateInterval = null;
+			} else {
+				this.guideUpper.style.opacity = "0";
+				var ab = [b.coords[0]-a.coords[0], b.coords[1]-a.coords[1]],
+					theta = Math.atan2(ab[1], ab[0]) * 180 / Math.PI - this.user.userAlpha;
+				this.guideLower.style.webkitTransform = 'rotate('+ theta +'deg)';
+			}
+		} else {
+			var a = this.path[0], b = this.path[1], c = this.path[2],
+				ab = [b.coords[0]-a.coords[0], b.coords[1]-a.coords[1]],
+				bc = [c.coords[0]-b.coords[0], c.coords[1]-b.coords[1]],
+				thetaAB = Math.atan2(ab[1], ab[0]) * 180 / Math.PI - this.user.userAlpha,
+				thetaBC = Math.atan2(bc[1], bc[0]) * 180 / Math.PI - this.user.userAlpha;
+			if (Math.abs(thetaAB) < 10){
+				this.guideUpper.style.opacity = "1";
+				this.guideUpper.style.webkitTransform = 'rotate('+ thetaBC +'deg)';
+			}
+			this.guideLower.style.webkitTransform = 'rotate('+ thetaAB +'deg)';
 		}
 	} else {
-		throw new Error("Cannot find nearest node for user.");
-	}
-	// Path finding
-	from = this.user;
-	to = this.findNodeByViewCoord(to);
-	this.path = this.findPath( from, to );
-	if (this.path == null){
-		throw new Error("No path found");
-	}
-	if (this.path.length == 2){	// 1 user node, 1 other node
-		var a = this.path[0], b = this.path[1];
-		dsp = Math.pow(a.coords[0] - b.coords[0]) + Math.pow(a.coords[1] - b.coords[1]);
-		if (dsp <= 6.25){	// within 2.5 feet
-			atDest = true;
-			clearInterval(this.userUpdateInterval);
-			this.userUpdateInterval = null;
-		}
-	}
-	if (atDest){
-		console.log("You are arrived!");
+		this.guideLower.style.opacity = "0";
+		this.guideUpper.style.opacity = "0";
+		console.log("Nothing to display.");
 	}
 }
 
@@ -411,21 +508,13 @@ ctr.prototype.loc = function ( from, to ){
 	this.context.calibrate();
 };
 
-// TODO replace with floor-checking method
+// TODO add floor-checking method
 ctr.prototype.navUser = function ( to, cxt ){
 	var self = this.context;
-	if (self.user == null){
-		self.user = new dm.Node(self.calibrate());
-	}
-
-	self.approx.style.left = self.user.coords[0] + 'px';
-	self.approx.style.top = self.user.coords[1] + 'px';
-
-	self.navUser2( to );
 	self.userUpdateInterval = setInterval(function (){
-		self.updateUser();
+		self.calibrate();
 		self.navUser2( to );
-	}, 1200);
+	}, 1100);
 };
 
 // param: not dm.Node
@@ -456,11 +545,11 @@ ctr.prototype.onEdgeCreate = function ( p1, p2 ){
 	var self = this.context;
 	if ( p1 == p2 ){
 		console.log("Warning: No edges created - duplicate vertices");
-		return;
+		return false;
 	}
 	p1 = self.findNodeByViewCoord(p1);
 	p2 = self.findNodeByViewCoord(p2);
-	if (!p1.isNeighbor(p2)){
+	if (!p1.isNeighbor(p2) && !p2.isNeighbor(p1)){
 		p1.vectors.push(p2);
 		p2.vectors.push(p1);
 		self.view.newEdge( p1, p2 );

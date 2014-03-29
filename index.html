@@ -18,55 +18,134 @@
 	<!-- styles -->
 	<style>
 	#user {
-		color: white;
 		position: absolute;
-		z-index: 10;
-		width: 20px;
-		height: 20px;
-		margin-left: -10px;
-		margin-top: -10px;
-		background-color: green;
-		border: 2px solid white;
+		z-index: 200;
+		margin-left: -6px;
+		margin-top: -9px;
+		border-left: 6px solid transparent;
+		border-right: 6px solid transparent;
+		border-bottom: 18px solid red;
 	}
 	#approx {
 		color: orange;
 		position: absolute;
-		z-index: 20;
-		width: 20px;
-		height: 20px;
-		margin-left: -10px;
-		margin-top: -10px;
-		border: 2px solid orange;
+		z-index: 210;
+		margin-left: -3px;
+		margin-top: -7px;
+		border-left: 3px solid transparent;
+		border-right: 3px solid transparent;
+		border-bottom: 14px solid orange;
 	}
-	.ruler {
-		display: inline-block;
-		width: 300px;
-		height: 5px;
-		border-left: 2px solid black;
-		border-top: 2px solid black;
-		margin-right: -2px;
-		margin-left: -2px;
+	#canvas {
+		z-index: 100;
+		position: absolute;
+		top: 0;
+		left: 0;
+		height:500px;
+		width:760px;
+	}
+	#canvasHighlight {
+		z-index: 1;
+		position: absolute;
+		top: 0;
+		left: 0;
+		height:500px;
+		width:760px;
+	}
+	#console {
+		position: absolute;
+		top: 500px;
+		left: 0;
+	}
+	#ruler {
+		position: absolute;
+		z-index: 5;
+		width: 760px;
+		height: 500px;
+		background:url(img/ruler.png);
+		opacity: 0.2;
+		top: 0;
+		left: 0;
+	}
+	#ruler2 {
+		position: absolute;
+		z-index: 6;
+		width: 760px;
+		height: 500px;
+		background:url(img/ruler2.png);
+		opacity: 0.4;
+		top: 0;
+		left: 0;
+	}
+	#saveBtn {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+	}
+	#background {
+		z-index: 0;
+		position: absolute;
+		top: 0;
+		left: 0;
+		background:url(img/test.png) no-repeat;
+		height:500px;
+		width:760px;
+	}
+	#guide {
+		z-index: 0;
+		position: absolute;
+		top: 0;
+		left: 760px;
+		border: 2px solid black;
+		height:500px;
+		width:300px;
+	}
+	#guideUpper {
+		z-index: 1;
+		position: absolute;
+		top: 195px;
+		left: 150px;
+		margin-left: -50px;
+		margin-top: -140px;
+		border-left: 50px solid transparent;
+		border-right: 50px solid transparent;
+		border-bottom: 140px solid orange;
+	}
+	#guideLower {
+		z-index: 1;
+		position: absolute;
+		top: 375px;
+		left: 150px;
+		margin-left: -50px;
+		margin-top: -70px;
+		border-left: 50px solid transparent;
+		border-right: 50px solid transparent;
+		border-bottom: 140px solid red;
 	}
 	</style>
 </head>
 <body>
 	<div id="approx" style="top: 10px; left: 10px; -webkit-transform: rotate(0deg);">
-		<span>^&nbsp;&nbsp;</span>
 	</div>
 	<div id="user" style="top: 10px; left: 10px; -webkit-transform: rotate(0deg);">
-		<span>&nbsp;&nbsp;^</span>
 	</div>
 	<div id="canvas">
 	</div>
-	<div>
-		<div class="ruler"></div>
-		<div class="ruler"></div>
-		<div class="ruler"></div>
-		<div class="ruler"></div>
+	<div id="ruler2">
+	</div>
+	<div id="ruler">
+	</div>
+	<div id="canvasHighlight">
+	</div>
+	<div id="background">
 	</div>
 	<div id="console">
 	</div>
 	<button id="saveBtn">Save graph</button>
+	<div id="guide">
+		<div id="guideUpper" style="-webkit-transform: rotate(0deg); opacity:0"></div>
+		<div id="guideLower" style="-webkit-transform: rotate(0deg); opacity:0"></div>
+	</div>
 </body>
 <script type="text/javascript">
 	$(document).ready(function (){

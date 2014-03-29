@@ -4,8 +4,10 @@
 vw = function Vw(){
 	// DOM properties; jQuery objects
 	this.canvas = null;
+	this.canvasHighlight = null;
 	this.console = null;
 	this.map = null;
+	this.mapHighlight = null;
 	this.u = null;;
 	// Editing status
 	this.isCreatingNode = false;
@@ -30,6 +32,7 @@ vw = function Vw(){
 
 vw.prototype.clear = function (){
 	this.map.clear();
+	this.mapHighlight.clear();
 	this.edges = [];
 	this.points = [];
 };
@@ -38,18 +41,16 @@ vw.prototype.init = function ( callbacks ){
 	var self = this;
 	this.console = $('#console');
 	this.canvas = $('#canvas');
-	this.canvas.css({
-		'background':'url(img/test.png) no-repeat',
-		'height':'500px',
-		'width':'760px'
-	});
 	this.canvas.svg();
 	this.map = this.canvas.svg('get');
+	this.canvasHighlight = $('#canvasHighlight');
+	this.canvasHighlight.svg();
+	this.mapHighlight = this.canvasHighlight.svg('get');
 	this.u = document.getElementById("user");
 	this.callbacks = callbacks;
 	this.canvas.on('click', function (event){
 		if (self.isCreatingNode){
-			var p = {'coords':[event.pageX-10, event.pageY-10]};
+			var p = {'coords':[event.pageX, event.pageY]};
 			if (self.isNodeVirtual){
 				p.type = dm.Node.TYPE_VIRTUAL;
 			} else {
@@ -61,7 +62,7 @@ vw.prototype.init = function ( callbacks ){
 			}
 		} else if (self.isMoving){
 			if (self.move.a !== null && self.move.b == null){
-				self.move.b = {'coords':[event.pageX-10, event.pageY-10]};
+				self.move.b = {'coords':[event.pageX, event.pageY]};
 				self.callbacks.updatePoint( self.move.a, self.move.b );
 				self.move.a = null; self.move.b = null;
 			}
@@ -117,16 +118,16 @@ vw.prototype.init = function ( callbacks ){
 				self.callbacks.loc();
 				break;
 			case 119: 	// w
-				self.u.style.top = (parseInt(self.u.style.top) - 3) + 'px';
+				self.u.style.top = (parseInt(self.u.style.top) - 12) + 'px';
 				break;
 			case 115: 	// s
-				self.u.style.top = (parseInt(self.u.style.top) + 3) + 'px';
+				self.u.style.top = (parseInt(self.u.style.top) + 12) + 'px';
 				break;
 			case 97: 	// a
-				self.u.style.left = (parseInt(self.u.style.left) - 3) + 'px';
+				self.u.style.left = (parseInt(self.u.style.left) - 12) + 'px';
 				break;
 			case 100: 	// d
-				self.u.style.left = (parseInt(self.u.style.left) + 3) + 'px';
+				self.u.style.left = (parseInt(self.u.style.left) + 12) + 'px';
 				break;
 			case 113: 	// q
 				var matrix = self.u.style.webkitTransform,
@@ -135,7 +136,7 @@ vw.prototype.init = function ( callbacks ){
 					var value = matrix.match(/rotate\((.+)deg\)/i);
 					angle = parseInt(value[1]);
 				} else { angle = 0; }
-				angle -= 5;
+				angle -= 10;
 				self.u.style.webkitTransform = 'rotate('+angle+'deg)';
 				break;
 			case 114: 	// r
@@ -145,7 +146,7 @@ vw.prototype.init = function ( callbacks ){
 					var value = matrix.match(/rotate\((.+)deg\)/i);
 					angle = parseInt(value[1]);
 				} else { angle = 0; }
-				angle += 5;
+				angle += 10;
 				self.u.style.webkitTransform = 'rotate('+angle+'deg)';
 				break;
 			default:
@@ -163,6 +164,7 @@ vw.prototype.newPoint = function ( p, highlight ){
 		attr = {fill:color, 'type':p.type};
 	} else if (p.type == dm.Node.TYPE_PHYSICAL){
 		attr = {fill:color, 'type':p.type, 'pid':p.pid};
+		this.mapHighlight.circle(p.coords[0], p.coords[1], 300, {fill:'green', stroke:'green', strokeWidth:'3px', strokeOpacity:'0.8', fillOpacity:'0.15'});
 	} else if (p.type == dm.Node.TYPE_USER){
 		color = 'grey';
 		attr = {fill:color, 'type':p.type};
@@ -174,7 +176,7 @@ vw.prototype.newPoint = function ( p, highlight ){
 		if (!highlight){
 			this.points.push(p);
 		}
-		var c = $( this.map.circle(p.coords[0], p.coords[1], 10, attr) );
+		var c = $( this.map.circle(p.coords[0], p.coords[1], 6, attr) );
 		c.on('click', function(event){
 			if (self.isDeleting){
 				self.callbacks.delPoint( p );
@@ -226,7 +228,7 @@ vw.prototype.newEdge = function ( p1, p2, highlight ){
 		if (!highlight){
 			this.edges.push([p1, p2]);
 		}
-		var e = $( this.map.line(p1.coords[0], p1.coords[1], p2.coords[0], p2.coords[1], {stroke:color,strokeWidth:5}) );
+		var e = $( this.map.line(p1.coords[0], p1.coords[1], p2.coords[0], p2.coords[1], {stroke:color,strokeWidth:3}) );
 		e.on('click', function(event){
 			if (self.isDeleting){
 				self.callbacks.delEdge( p1, p2 );

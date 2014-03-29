@@ -86,26 +86,30 @@ dm.prototype.init = function ( json ){
 	}
 	// Beacons
 	var nodes = json.Nodes;
-	for (var i = 0; i < nodes.length; i++){
-		var n = new dm.Node(nodes[i]),
-			mf = this.findFloorById(n.floor);
-		// Vertical linking
-		if (mf != null){
-			n.floor = mf;	// Replace string id with object
-		} else {
-			throw new Error('Cannot find floor ID '+n.floor+' of node '+n.id);
-		}
-		this.model.nodes.push( n );
-	}
-	// Horizontal linking
-	for (var i = 0; i < this.model.nodes.length; i++){
-		var n = this.model.nodes[i], mn = null;
-		for (var j = 0; j < n.vectors.length; j++){
-			mn = this.findNodeById(n.vectors[j]);
-			if (mn != null){
-				n.vectors[j] = mn;
+	if (nodes == undefined){
+		this.model.nodes = [];
+	} else {
+		for (var i = 0; i < nodes.length; i++){
+			var n = new dm.Node(nodes[i]),
+				mf = this.findFloorById(n.floor);
+			// Vertical linking
+			if (mf != null){
+				n.floor = mf;	// Replace string id with object
 			} else {
-				throw new Error('Cannot find node ID '+n.vectors[j]+' of vectors of node '+n.id);
+				throw new Error('Cannot find floor ID '+n.floor+' of node '+n.id);
+			}
+			this.model.nodes.push( n );
+		}
+		// Horizontal linking
+		for (var i = 0; i < this.model.nodes.length; i++){
+			var n = this.model.nodes[i], mn = null;
+			for (var j = 0; j < n.vectors.length; j++){
+				mn = this.findNodeById(n.vectors[j]);
+				if (mn != null){
+					n.vectors[j] = mn;
+				} else {
+					throw new Error('Cannot find node ID '+n.vectors[j]+' of vectors of node '+n.id);
+				}
 			}
 		}
 	}

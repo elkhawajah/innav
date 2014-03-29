@@ -83,7 +83,8 @@ sensor.prototype.getCompass = function (){
 			var value = matrix.match(/rotate\((.+)deg\)/i);
 			angle = parseInt(value[1]);
 		} else { angle = 0; }
-		return angle;
+		// TODO normalize with floor alpha first
+		return (angle-90) % 360;	// normalize CSS rotation to xy plane rotation, where 0 degree vector is +x axis, and clockwise is positive
 	}
 };
 
@@ -96,15 +97,16 @@ sensor.prototype.getSignals = function (){
 		scale = 6,	// TODO replace hardcoded scale
 		dLimitSqr = Math.pow(50 * scale, 2);	// TODO replace hardcoded distance; distance in pixels
 	var randomError = function ( distance ){	// Gaussian random number
+		// 3 sigma accounts for 99.7% of frequencies
 		var mu = distance, sigma, y;
-		if (mu >= 32){
-			sigma = 5;
-		} else if (mu < 32 && mu >= 6.5){
-			sigma = 3.25;
-		} else if (mu < 6.5 && mu >= 3.2){
-			sigma = 0.25;
-		} else {
-			sigma = 0.095;
+		if (mu >= 32){	// > 10 m: 2~3 m
+			sigma = 3.3;
+		} else if (mu < 32 && mu >= 6.5){	// above 2 m: ~ 2 m
+			sigma = 2.2;
+		} else if (mu < 6.5 && mu >= 3.2){	// 1-2 m: 15 cm
+			sigma = 0.17;
+		} else {	// < 1 m : 15 cm
+			sigma = 0.06;
 		}
 		// convert to Gaussian distribution
 		var x1, x2, w, y1, y2;
