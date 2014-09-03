@@ -6,6 +6,8 @@ sensor = function Sensor(){
 	};
 	this.currentFloor = null;	// TODO read from signal record
 	this.u = document.getElementById("user");
+	this.k = 4/1225;
+	this.a = 12.755;
 };
 
 sensor.prototype.start = function (){
@@ -88,6 +90,13 @@ sensor.prototype.getCompass = function (){
 	}
 };
 
+sensor.prototype.sig = function( mean ){
+	// Energy falloff: alpha / ( 1 + k * distance^2 )
+	// Sigma is energy falloff flipped; 0 <= mean <= 70
+	// alpha / ( 1 + k * (distance - 70)^2 )
+	return this.a/(1+this.k*(mean-70)*(mean-70));
+};
+
 // tmp sensor measurement
 sensor.prototype.getSignals = function (){
 	var r = [],
@@ -95,19 +104,10 @@ sensor.prototype.getSignals = function (){
 		// if scale is 1/16 inch per foot, then it's 6 pixels per foot
 		// scale unit is px/ft
 		scale = 6,	// TODO replace hardcoded scale
-		dLimitSqr = Math.pow(50 * scale, 2);	// TODO replace hardcoded distance; distance in pixels
+		dLimitSqr = Math.pow(32.8 * scale, 2);	// TODO replace hardcoded distance; distance in pixels
+	var self = this;
 	var randomError = function ( distance ){	// Gaussian random number
-		// 3 sigma accounts for 99.7% of frequencies
-		var mu = distance, sigma, y;
-		if (mu >= 32){	// > 10 m: 2~3 m
-			sigma = 3.3;
-		} else if (mu < 32 && mu >= 6.5){	// above 2 m: ~ 2 m
-			sigma = 2.2;
-		} else if (mu < 6.5 && mu >= 3.2){	// 1-2 m: 15 cm
-			sigma = 0.17;
-		} else {	// < 1 m : 15 cm
-			sigma = 0.06;
-		}
+		var mu = distance, sigma = self.sig(mu), y;
 		// convert to Gaussian distribution
 		var x1, x2, w, y1, y2;
 		do {

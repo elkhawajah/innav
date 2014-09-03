@@ -460,6 +460,7 @@ ctr.prototype.navUser2 = function ( to ){
 			var a = this.path[0], b = this.path[1],
 			dsp = Math.pow(a.coords[0] - b.coords[0], 2) + Math.pow(a.coords[1] - b.coords[1], 2);
 			if (dsp <= 6.25*scale*scale){	// within 2.5 feet
+				alert("You are arrived!");
 				console.log("You are arrived!");
 				this.guideLower.style.opacity = "0";
 				this.guideUpper.style.opacity = "0";
@@ -528,13 +529,11 @@ ctr.prototype.onPointCreate = function ( p ){
 			'Type': p.type,
 			'Floor': self.model.model.floors[0]	// TODO: current floor
 		};
-	if (nlist.length === 0){
-		json.GID = '0';
-	} else {
-		json.GID = nlist.length.toString();
-	}
+	var d = new Date();
+	var n = d.getTime();
+	json.GID = n;
 	if (p.type == dm.Node.TYPE_PHYSICAL){
-		json.PID = p.pid;
+		json.PID = n;
 	}
 	nlist.push( new dm.Node( json ) );
 	self.view.newPoint( p );

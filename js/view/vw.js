@@ -41,7 +41,7 @@ vw.prototype.init = function ( callbacks ){
 	var self = this;
 	this.console = $('#console');
 	this.canvas = $('#canvas');
-	this.canvas.svg();
+	this.canvas.svg({settings:{id:'svgcanvas'}});
 	this.map = this.canvas.svg('get');
 	this.canvasHighlight = $('#canvasHighlight');
 	this.canvasHighlight.svg();
@@ -164,7 +164,7 @@ vw.prototype.newPoint = function ( p, highlight ){
 		attr = {fill:color, 'type':p.type};
 	} else if (p.type == dm.Node.TYPE_PHYSICAL){
 		attr = {fill:color, 'type':p.type, 'pid':p.pid};
-		this.mapHighlight.circle(p.coords[0], p.coords[1], 300, {fill:'green', stroke:'green', strokeWidth:'3px', strokeOpacity:'0.8', fillOpacity:'0.15'});
+		this.mapHighlight.circle(p.coords[0], p.coords[1], 60, {fill:'green', stroke:'green', strokeWidth:'3px', strokeOpacity:'0.4', fillOpacity:'0.05'});
 	} else if (p.type == dm.Node.TYPE_USER){
 		color = 'grey';
 		attr = {fill:color, 'type':p.type};

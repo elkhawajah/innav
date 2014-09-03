@@ -122,25 +122,35 @@
 		border-right: 50px solid transparent;
 		border-bottom: 140px solid red;
 	}
+	#guidance1 {
+		z-index: 1;
+		position: absolute;
+		left: 0;
+		width: 760px;
+		height: 1px;
+		background-color: orange;
+	}
+	#guidance2 {
+		z-index: 1;
+		position: absolute;
+		top: 0;
+		height: 500px;
+		width: 1px;
+		background-color: orange;
+	}
 	</style>
 </head>
 <body>
-	<div id="approx" style="top: 10px; left: 10px; -webkit-transform: rotate(0deg);">
-	</div>
-	<div id="user" style="top: 10px; left: 10px; -webkit-transform: rotate(0deg);">
-	</div>
-	<div id="canvas">
-	</div>
-	<div id="ruler2">
-	</div>
-	<div id="ruler">
-	</div>
-	<div id="canvasHighlight">
-	</div>
-	<div id="background">
-	</div>
-	<div id="console">
-	</div>
+	<div id="approx" style="top: 10px; left: 10px; -webkit-transform: rotate(0deg);"></div>
+	<div id="user" style="top: 10px; left: 10px; -webkit-transform: rotate(0deg);"></div>
+	<div id="canvas"></div>
+	<div id="guidance1"></div>
+	<div id="guidance2"></div>
+	<div id="ruler2"></div>
+	<div id="ruler"></div>
+	<div id="canvasHighlight"></div>
+	<div id="background"></div>
+	<div id="console"></div>
 	<button id="saveBtn">Save graph</button>
 	<div id="guide">
 		<div id="guideUpper" style="-webkit-transform: rotate(0deg); opacity:0"></div>
@@ -151,6 +161,7 @@
 	$(document).ready(function (){
 		var controller = null;
 		var saveBtn = $('#saveBtn');
+		var g1 = $('#guidance1'), g2 = $('#guidance2');
 		$.ajax({
 			url: 'json/test_user_s.json',
 			type: 'get',
@@ -176,6 +187,13 @@
 			error : function(xhr, status, error) {
 				throw new Error(xhr.responseText);
 			}
+		});
+		$(document.body).on("mousemove", function(ev){
+			var x = ev.pageX, y = ev.pageY;
+			if (x > 760) x = 760;
+			if (y > 500) y = 500;
+			g1.css('top', y);
+			g2.css('left', x);
 		});
 	});
 </script>
