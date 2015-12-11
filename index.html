@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Innav : Indoor Navigation Sandbox. Please read README before trying out demo. Demo:">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Innav</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/StoneBird/innav">View on GitHub</a>
+
+          <h1 id="project_title">Innav</h1>
+          <h2 id="project_tagline">Indoor Navigation Sandbox. Please read README before trying out demo. Demo:</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/StoneBird/innav/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/StoneBird/innav/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a id="indoor-navigation-sandbox" class="anchor" href="#indoor-navigation-sandbox" aria-hidden="true"><span class="octicon octicon-link"></span></a>Indoor navigation sandbox</h1>
+
+<p>This is a web application to simulate indoor navigation schemes with beacons on a graph-based system. Features include node graph editing, graph path-finding &amp; navigation, signal &amp; sensor simulation, locationing simulation.</p>
+
+<p>This tool is very prototypic, so please open your browser console to see more messages displayed by the sandbox.</p>
+
+<h5>
+<a id="table-of-contents" class="anchor" href="#table-of-contents" aria-hidden="true"><span class="octicon octicon-link"></span></a>Table of Contents</h5>
+
+<ul>
+<li>
+<a href="#features">Features</a><br>
+</li>
+<li><a href="#methods-of-simulation">Methods of simulation</a></li>
+<li><a href="#file-format">File format</a></li>
+</ul>
+
+<h2>
+<a id="features" class="anchor" href="#features" aria-hidden="true"><span class="octicon octicon-link"></span></a>Features</h2>
+
+<p>The sandbox works by enabling once at a time of the various modes to either edit the graph or simulate a navigation.</p>
+
+<ul>
+<li>Editing:
+
+<ul>
+<li>
+<code>v</code> or <code>p</code>: add a new node.
+
+<ul>
+<li>Physical node is used to represent actual hardware nodes, where virtual node is for arbitrary nodes of the graph.</li>
+<li>Left-click to place a node on the graph.</li>
+</ul>
+</li>
+<li>
+<code>e</code>: add a new edge.
+
+<ul>
+<li>Left-click on two nodes subsequently to create an edge.</li>
+<li>You cannot create a loop by clicking the same node twice.</li>
+</ul>
+</li>
+<li>
+<code>x</code>: delete an element.
+
+<ul>
+<li>Left-click to delete either a node or an edge.</li>
+</ul>
+</li>
+<li>
+<code>m</code>: move a node.
+
+<ul>
+<li>Left-click on a node to pick it up, and left-click again to drop it on the new location.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Simulation:
+
+<ul>
+<li>
+<code>f</code>: find the shortest path between two nodes.
+
+<ul>
+<li>No path is created if the nodes are disconnected.</li>
+<li>Left-click on two nodes subsequently to find the path.</li>
+</ul>
+</li>
+<li>
+<code>l</code>: locate the user.
+
+<ul>
+<li>User actual is displayed as bigger red triangle.</li>
+<li>User accuracy is displayed as smaller orange triangle.</li>
+<li>Use <code>WASD</code> to move user actual.</li>
+<li>Use <code>QR</code> to rotate user actual.</li>
+</ul>
+</li>
+<li>
+<code>n</code>: on top of locationing, it finds the path to a node and displays the navigation w.r.t the user orientation.
+
+<ul>
+<li>Left-click on a node to set it as destination. Clicking other parts of the graph will set the nearest node as destination.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<code>c</code>: turn off all modes
+
+<ul>
+<li>This clears out the mouse from all modes.</li>
+<li>It will not stop an ongoing simulation.</li>
+</ul>
+</li>
+</ul>
+
+<h2>
+<a id="methods-of-simulation" class="anchor" href="#methods-of-simulation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Methods of simulation</h2>
+
+<ul>
+<li>Simulating signals
+
+<ul>
+<li>There are no actual signal emitters. In other words, the sensoring is not event-based. It is not necessary to have an event-based model for simulating signal emitting and sensoring since we want to keep the sampling at its own pace, without generating useless data in between each sampling.</li>
+<li>The sandbox simply keeps the readings of sources for later calculation.</li>
+<li>The sandbox has a scheduled task that counts the distances of all signal sources except those outside a certain bound. The bound is arbitrary, but should be the distance where beacon signal are unreceivable (in reality).</li>
+<li>The task will then add noise to the distance "actual", which is generated by a gaussian function. The variance of the function is determined by the x-axis inverse of intensity fall-off function in "inverse-squared" form. As a result, the further of a signal source, the larger the noise distribution, hence the less the accuracy.</li>
+</ul>
+</li>
+<li>Simulating processing readings:
+
+<ul>
+<li>The function of noise cancelling simply returns the median of the readings of each signal source.</li>
+</ul>
+</li>
+<li>Simulating locationing: the sandbox finds the user location by multi-lateration of the stored readings
+
+<ul>
+<li>If only one reading: out of luck.</li>
+<li>If two readings: the sandbox will notify the user to move a little bit to determine the third vector. Locationing with only two readings is badly inaccurate, but won't be way off.</li>
+<li>If 3+ readings: pick the nearest 3 and trilaterate.</li>
+</ul>
+</li>
+<li>Navigating:
+
+<ul>
+<li>The sandbox shows navigation based on collected user accuracy and calculated path.</li>
+<li>User accuracy is assumed to be a unit vector, where angle is the user orientation. Path vector is simply the edge to the next node with a direction.</li>
+<li>The navigation, w.r.t the user, is then determined by subtracting the two vectors.</li>
+</ul>
+</li>
+</ul>
+
+<h2>
+<a id="file-format" class="anchor" href="#file-format" aria-hidden="true"><span class="octicon octicon-link"></span></a>File format</h2>
+
+<p>The application saves to and reads in a simple text file in <code>JSON</code> format. The structure of the object is as following:</p>
+
+<pre><code>{
+    "Building":{
+        "name":"Awesome building",
+        "id":"0",
+        "UID":"1"
+        },
+    "Floors":[
+        {
+            "id":"0",
+            "name":"Good floor",
+            "alpha":0,
+            "scale":[10,1]
+        },
+        ...
+    ],
+    "Nodes":[
+        {
+            "GID":"0",
+            "Coords":[90,100],
+            "Vectors":["001"],
+            "Type":"PHYSICAL_NODE",
+            "PID":"0",
+            "Floor":"0"
+        },
+        ...
+    ]
+}
+</code></pre>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Innav maintained by <a href="https://github.com/StoneBird">StoneBird</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
